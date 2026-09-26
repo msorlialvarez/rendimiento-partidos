@@ -1,0 +1,1526 @@
+<title>Rendimiento de Partidos VBC</title>
+<meta name="description" content="App para subir y guardar el export XML de Nacsport de cada partido, y ver el análisis de ataque por partido, por rival o de toda la temporada.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: light;
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #efeae1;
+    --ink: #18140f;
+    --ink-2: #5c554a;
+    --ink-3: #8f877a;
+    --line: #e4ddd0;
+    --border: rgba(24,20,15,0.10);
+    --accent: #e2571f;
+    --accent-ink: #ffffff;
+    --accent-wash: #fbe4d7;
+    --good: #0ca30c;
+    --good-wash: #dcefdc;
+    --miss: #c7bfb0;
+    --three: #2b6ca3;
+    --three-wash: #cddef0;
+    --critical: #c73b3b;
+    --critical-wash: #f6dede;
+    --warn: #b9860a;
+    --warn-wash: #faf0d6;
+    --head-bg: #18140f;
+    --head-ink: #f6f3ee;
+    --shadow: 0 1px 2px rgba(24,20,15,0.06), 0 8px 24px -12px rgba(24,20,15,0.18);
+
+    --c-fast-bg: #e4f0d9; --c-fast-ink:#3a5d24;
+    --c-trans-bg:#f7dfe0; --c-trans-ink:#8a3232;
+    --c-oreb-bg: #fbdfc0; --c-oreb-ink:#8a5416;
+    --c-sets-bg: #dde7f5; --c-sets-ink:#31517e;
+    --c-side-bg: #fbeccb; --c-side-ink:#8a6316;
+    --c-base-bg: #f3dede; --c-base-ink:#8a3232;
+    --subtotal-bg: #efeae1;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Karla, "Segoe UI", system-ui, sans-serif;
+    padding-inline: 20px;
+    padding-block: 28px 60px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  h1,h2,h3{ font-family: Oswald, "Segoe UI", system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.02em; margin: 0; }
+  .mono{ font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  a{ color: var(--accent); }
+
+  /* ---------- app header ---------- */
+  header.top{
+    display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:16px;
+    padding-block-end: 18px; margin-block-end: 22px; border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow{ font-size: 12px; letter-spacing: 0.12em; color: var(--accent); font-weight:700; text-transform:uppercase; margin-block-end: 6px; }
+  h1{ font-size: clamp(22px, 4vw, 32px); color: var(--ink); line-height:1.05;}
+  .subtitle{ color: var(--ink-2); font-size: 13.5px; margin-block-start:6px; max-width:64ch; }
+
+  .app-nav{ display:inline-flex; gap:6px; flex-wrap:wrap; }
+  .app-nav button{
+    font-family:Karla,sans-serif; font-size:12.5px; font-weight:700; letter-spacing:.02em;
+    background:var(--surface-2); color:var(--ink-2); border:none; padding:9px 15px; border-radius:20px; cursor:pointer;
+  }
+  .app-nav button.active{ background:var(--ink); color:#fff; }
+
+  .page{ display:none; }
+  .page.active{ display:block; }
+
+  /* ---------- generic controls ---------- */
+  .btn{
+    display:inline-flex; align-items:center; gap:7px; background:var(--ink); color:#fff; border:none;
+    font-family:Karla,sans-serif; font-size:12.5px; font-weight:700; letter-spacing:.02em;
+    padding:9px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;
+  }
+  .btn:hover{ background:var(--accent); }
+  .btn.secondary{ background:var(--surface-2); color:var(--ink); }
+  .btn.secondary:hover{ background:var(--line); }
+  .btn.danger{ background:var(--surface); color:var(--critical); border:1px solid var(--critical-wash); }
+  .btn.danger:hover{ background:var(--critical-wash); }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .btn svg{ width:14px; height:14px; flex:none; }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); padding:18px 20px; }
+  section{ margin-block-end: 30px; }
+  section > h2{ font-size:17px; margin-block-end:4px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  section > h2 .count{ font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-3); text-transform:none; letter-spacing:0; font-weight:500;}
+  .section-note{ font-size:12.5px; color: var(--ink-3); margin-block-end:16px; max-width: 70ch; }
+
+  /* ---------- forms ---------- */
+  .form-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:14px; }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field label{ font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-3); font-weight:700; }
+  .field input, .field select{
+    font-family:Karla,sans-serif; font-size:14px; padding:9px 10px; border-radius:7px; border:1px solid var(--border);
+    background:var(--bg); color:var(--ink);
+  }
+  .field input:focus, .field select:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .file-drop{
+    display:block; border:2px dashed var(--border); border-radius:10px; padding:22px; text-align:center; color:var(--ink-2); font-size:13px;
+    cursor:pointer; background:var(--surface-2);
+  }
+  .file-drop.drag{ border-color:var(--accent); background:var(--accent-wash); }
+  .file-drop input{ display:none; }
+  .file-drop .fname{ font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--ink); margin-block-start:6px; }
+
+  .banner{ border-radius:10px; padding:12px 16px; font-size:13px; margin-block:14px; display:flex; gap:10px; align-items:flex-start; }
+  .banner.warn{ background:var(--warn-wash); color:#6b4d05; }
+  .banner.ok{ background:var(--good-wash); color:#0a5c0a; }
+  .banner.info{ background:var(--surface-2); color:var(--ink-2); }
+  .banner ul{ margin:6px 0 0; padding-inline-start:18px; }
+
+  /* ---------- matches table ---------- */
+  table.simple{ border-collapse:collapse; width:100%; font-size:13px; }
+  table.simple th{
+    text-align:left; font-family:"IBM Plex Mono",monospace; font-size:10.5px; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--ink-3); font-weight:600; padding:8px; border-bottom:1px solid var(--line);
+  }
+  table.simple td{ padding:9px 8px; border-bottom:1px dashed var(--line); vertical-align:middle; }
+  table.simple tr:last-child td{ border-bottom:none; }
+  table.simple .rival{ font-weight:700; }
+  .pill{ display:inline-block; background:var(--surface-2); color:var(--ink-2); font-size:11px; padding:2px 9px; border-radius:20px; }
+  .row-actions{ display:flex; gap:6px; }
+  .row-actions button{
+    font-family:Karla,sans-serif; font-size:11.5px; font-weight:700; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;
+  }
+  .row-actions .btn-view{ background:var(--ink); color:#fff; }
+  .row-actions .btn-view:hover{ background:var(--accent); }
+  .row-actions .del{ background:var(--surface); color:var(--critical); border:1px solid var(--critical-wash); }
+  .row-actions .del:hover{ background:var(--critical-wash); }
+  .empty-note{ color:var(--ink-3); font-size:13px; padding:20px; text-align:center; }
+
+  select.rival-select{ font-family:Karla,sans-serif; font-size:13.5px; padding:9px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg); }
+
+  /* ---------- config tables ---------- */
+  .cfg-table input[type=text]{
+    font-family:Karla,sans-serif; font-size:13px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); width:100%;
+  }
+  .cfg-table select{ font-family:Karla,sans-serif; font-size:13px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); }
+  .badge-warn{ background:var(--warn-wash); color:#6b4d05; font-size:10.5px; padding:2px 7px; border-radius:10px; font-weight:700; }
+
+  /* ---------- report header ---------- */
+  .report-head{ display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:16px; padding-block-end:16px; margin-block-end:20px; border-bottom:2px solid var(--ink); }
+  .report-head h2{ font-size: clamp(20px,3.4vw,28px); }
+  .report-eyebrow{ font-size:11.5px; letter-spacing:.1em; color:var(--accent); font-weight:700; text-transform:uppercase; margin-block-end:6px; }
+  .report-sub{ color:var(--ink-2); font-size:13px; margin-block-start:5px; max-width:60ch; }
+  .top-meta{ text-align:right; font-size:12px; color: var(--ink-3); }
+  .tabs{ display:inline-flex; gap:6px; margin-block-start:10px; }
+  .tab-btn{
+    font-family:Karla,sans-serif; font-size:12px; font-weight:700; letter-spacing:.02em;
+    background:var(--surface-2); color:var(--ink-2); border:none; padding:7px 13px; border-radius:20px; cursor:pointer;
+  }
+  .tab-btn.active{ background:var(--ink); color:#fff; }
+  .pdf-btn{
+    display:inline-flex; align-items:center; gap:7px; background:var(--ink); color:#fff; border:none;
+    font-family:Karla,sans-serif; font-size:12.5px; font-weight:700; letter-spacing:.02em;
+    padding:9px 14px; border-radius:8px; cursor:pointer; white-space:nowrap; margin-block-start:10px;
+  }
+  .pdf-btn:hover{ background:var(--accent); }
+  .pdf-btn svg{ width:14px; height:14px; flex:none; }
+  .back-btn{ background:none; border:none; color:var(--ink-2); font-family:Karla,sans-serif; font-size:12.5px; font-weight:700; cursor:pointer; padding:0; margin-block-end:14px; display:inline-flex; align-items:center; gap:5px; }
+  .back-btn:hover{ color:var(--accent); }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .kpis{ display:grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr)); gap:1px; background: var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-block-end: 32px; }
+  .kpi{ background: var(--surface); padding:16px 14px; }
+  .kpi .val{ font-family:"IBM Plex Mono",monospace; font-size:26px; font-weight:600; line-height:1; }
+  .kpi .lbl{ font-size:11px; color:var(--ink-3); text-transform:uppercase; letter-spacing:0.06em; margin-block-start:6px; }
+  .kpi .sub{ font-size:11px; color:var(--ink-2); margin-block-start:2px; }
+  .kpi.accent .val{ color: var(--accent); }
+  .kpi.good .val{ color: var(--good); }
+  .kpi.critical .val{ color: var(--critical); }
+
+  .rowlist{ display:flex; flex-direction:column; gap:9px; }
+  .print-cols{ display:none; } /* solo se muestran al imprimir; ver makePrintColumns */
+  /* .name lleva un ancho fijo puesto por JS (fitNameColumn), calculado a partir
+     del texto más largo de cada lista, para que el nombre del sistema o
+     jugadora nunca se corte con puntos suspensivos. */
+  .rank-row{ display:flex; align-items:center; gap:10px; position:relative; }
+  .rank-row .name{ flex:0 0 auto; font-size:13px; color:var(--ink); white-space:nowrap; text-align:right; }
+  .rank-row .track{ flex:1 1 auto; min-width:0; position:relative; height:16px; background:var(--surface-2); border-radius:4px; overflow:hidden; }
+  .rank-row .fill{ position:absolute; inset:0 auto 0 0; height:100%; background:var(--accent); border-radius:4px; transition:width .5s ease; cursor:pointer; }
+  .rank-row .n{ flex:0 0 auto; font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--ink-2); text-align:right; white-space:nowrap; }
+
+  .stack-row{ display:flex; align-items:center; gap:10px; }
+  .stack-row .name{ flex:0 0 auto; font-size:13px; color:var(--ink); white-space:nowrap; text-align:right; }
+  .stack-row .track{ flex:1 1 auto; min-width:0; position:relative; height:16px; background:var(--surface-2); border-radius:4px; overflow:hidden; display:flex; }
+  .stack-row .seg{ height:100%; cursor:pointer; }
+  .stack-row .seg.made{ background:var(--good); }
+  .stack-row .seg.missed{ background:var(--miss); }
+  .stack-row .seg.t2made{ background:var(--accent); }
+  .stack-row .seg.t2missed{ background:var(--accent-wash); }
+  .stack-row .seg.t3made{ background:var(--three); }
+  .stack-row .seg.t3missed{ background:var(--three-wash); }
+  .stack-row .pct{ flex:0 0 auto; font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-2); text-align:right; white-space:nowrap; }
+  .stack-row .pct b{ color:var(--ink); font-size:13px; }
+
+  .legend-inline{ display:flex; gap:16px; font-size:11.5px; color:var(--ink-3); margin-block-end:14px; flex-wrap:wrap; }
+  .legend-inline span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend-inline i{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+
+  .grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap:20px; }
+  .grid-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:20px; }
+  @media (max-width: 640px){ .grid-2{ grid-template-columns: 1fr; } .grid-3{ grid-template-columns: 1fr; } }
+  @media (max-width: 900px){ .grid-3{ grid-template-columns: 1fr 1fr; } }
+
+  .small-list{ display:flex; flex-direction:column; gap:7px; }
+  .sublabel{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-block-end:10px; }
+  .sublabel-2{ margin-block-start:14px; }
+  .small-cols{ display:flex; gap:16px; }
+  .small-col{ flex:1 1 0; min-width:0; }
+  .small-col-label{ font-size:11px; font-weight:600; color:var(--ink-3); text-transform:uppercase; letter-spacing:.03em; margin-block-end:6px; }
+  .small-list .li{ display:flex; justify-content:space-between; align-items:center; font-size:13px; padding-block:4px; border-bottom:1px dashed var(--line); }
+  .small-list .li:last-child{ border-bottom:none; }
+  .small-list .n{ font-family:"IBM Plex Mono",monospace; color:var(--ink); font-weight:600; }
+
+  .pairs-table{ border-collapse:collapse; width:100%; min-width:560px; font-size:13px; }
+  .pairs-table th{ text-align:left; font-family:"IBM Plex Mono",monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-3); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line); }
+  .pairs-table td{ padding:7px 8px; border-bottom:1px dashed var(--line); vertical-align:middle; }
+  .pairs-table tr:last-child td{ border-bottom:none; }
+  .pairs-table .sysname{ font-weight:700; font-size:12.5px; }
+  .pairs-table .arrow{ color:var(--ink-3); text-align:center; }
+  .pairs-table .times{ font-family:"IBM Plex Mono",monospace; text-align:center; }
+  .pairs-table .times.rep{ color:var(--accent); font-weight:700; }
+  .pairs-table .shotrec{ font-family:"IBM Plex Mono",monospace; color:var(--ink-2); white-space:nowrap; }
+  .pairs-table .exito-yes{ color:var(--good); font-weight:700; }
+  .pairs-table .exito-no{ color:var(--ink-3); }
+  .pairs-table .sysbadges{ display:flex; flex-wrap:wrap; gap:5px; max-width:280px; }
+  .sysbadge{ display:inline-block; background:var(--surface-2); color:var(--ink-2); font-family:"IBM Plex Mono",monospace; font-size:10.5px; padding:2px 7px; border-radius:20px; white-space:nowrap; }
+  .dim{ color: var(--ink-3); }
+
+  #tt{ position:fixed; pointer-events:none; z-index:50; background:var(--ink); color:var(--bg); font-size:12px; padding:6px 9px; border-radius:6px; opacity:0; transform:translate(-50%,-100%); transition:opacity .1s ease; white-space:nowrap; font-family:Karla,sans-serif; }
+
+  .page-footer{ margin-block-start:30px; padding-block-start:16px; border-top:1px solid var(--line); font-size:11.5px; color:var(--ink-3); line-height:1.6; max-width:92ch; }
+  .page-footer b{ color:var(--ink-2); }
+  .page-footer ul{ margin:6px 0 0; padding-inline-start:18px; }
+
+  .table-title{ font-size:20px; margin-block-end:6px; }
+  .legend-note{ font-size:12.5px; color:var(--ink-3); max-width:78ch; margin-block-end:18px; }
+  .tablewrap{ overflow-x:auto; border-radius:12px; box-shadow:var(--shadow); border:1px solid var(--border); }
+  #viewTable table{ border-collapse:collapse; width:100%; min-width:920px; background:var(--surface); }
+  #viewTable thead th{ background: var(--head-bg); color: var(--head-ink); font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; padding:10px 8px; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:2; }
+  #viewTable thead th.catcol{ text-align:left; padding-inline-start:14px; position:sticky; left:0; z-index:3; }
+  #viewTable tbody td{ padding:8px; text-align:center; font-family:"IBM Plex Mono",monospace; font-size:12.5px; border-bottom:1px solid var(--line); white-space:nowrap; color:var(--ink); }
+  #viewTable tbody td.label{ text-align:left; font-family:Karla,sans-serif; font-size:13px; font-weight:600; padding-inline-start:14px; }
+  #viewTable tbody td.catcell{ text-align:left; font-family:Oswald,sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.03em; font-weight:700; vertical-align:middle; padding-inline-start:14px; position:sticky; left:0; }
+  #viewTable tbody tr.subtotal td{ font-weight:700; background:var(--subtotal-bg); border-top:1px solid var(--line); border-bottom:2px solid var(--line); }
+  #viewTable tbody tr.subtotal td.label{ font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  .oer-good{ color: var(--good); font-weight:700; }
+  .oer-bad{ color: var(--critical); }
+
+  @media print{
+    @page{ size: A4 landscape; margin: 10mm 11mm; }
+    .pdf-btn, .tabs, #tt, header.top, .app-nav, .back-btn{ display:none !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body{ max-width:100%; padding:0; font-size:11px; }
+    .page{ display:none !important; }
+    .page.active{ display:block !important; }
+    .view{ display:block !important; }
+    #viewTable{ break-before: page; }
+
+    .report-head{ padding-block-end:8px; margin-block-end:12px; border-bottom-width:2px; }
+    .report-eyebrow{ font-size:9.5px; margin-block-end:3px; }
+    .report-head h2{ font-size:22px; }
+    .report-sub{ display:block; font-size:10.5px; }
+    .top-meta{ font-size:9px; }
+
+    /* KPIs siguen siendo el titular de la página: se quedan grandes. */
+    .kpis{ margin-block-end:10px; }
+    .kpi{ padding:6px 10px; }
+    .kpi .val{ font-size:19px; }
+    .kpi .lbl{ font-size:8px; margin-block-start:3px; }
+    .kpi .sub{ font-size:8px; }
+
+    /* Las secciones largas pueden partirse entre páginas (evita dejar
+       huecos en blanco); lo que sí se protege es la fila individual
+       (rank-row, stack-row, fila de tabla, li) para que no se corte a la
+       mitad, y las secciones cortas (parejas, pérdidas/faltas) que caben
+       enteras en lo que quede de página. */
+    section{ margin-block-end:5px; }
+    section:has(.pairs-table), section:has(.small-list){ break-inside: avoid; }
+    section > h2{
+      font-size:12.5px; margin-block-end:2px; padding-inline-start:9px;
+      border-inline-start: 3px solid var(--accent); break-after: avoid;
+    }
+    .section-note{ break-after: avoid; }
+    section > h2 .count{ font-size:8.5px; }
+    .section-note{ display:block; font-size:9px; margin-block-end:8px; max-width:none; }
+    .legend-inline{ display:flex; font-size:8.5px; margin-block-end:8px; }
+    .card{ box-shadow:none; padding:6px 9px; border-width:1px; break-inside: avoid; }
+
+    /* column-count de CSS combinado con las filas grid/flex de estas listas
+       desalinea números y barras entre columnas en el PDF de Chromium; las
+       2 columnas se construyen a mano en JS (ver makePrintColumns) y aquí
+       solo se ocultan las listas originales de una columna. */
+    .rowlist{ display:none; }
+    .print-cols{ display:flex; gap:16px; }
+    .print-col{ flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:3px; }
+    /* el ancho de .name lo fija fitNameColumn() en JS (a partir del texto más
+       largo, medido a tamaño de pantalla) y se conserva al clonar filas para
+       makePrintColumns, así el nombre nunca sale cortado con puntos suspensivos. */
+    .rank-row, .stack-row{ display:flex; align-items:center; break-inside: avoid; }
+    .rank-row .track, .stack-row .track{ flex:1 1 auto; margin-inline:7px; }
+    .rank-row .n{ flex:0 0 auto; }
+    .stack-row .pct{ flex:0 0 56px; }
+    .rank-row .name, .stack-row .name{ font-size:9px; }
+    .rank-row .track, .stack-row .track{ height:6px; border-radius:3px; }
+    .rank-row .n{ font-size:8.5px; }
+    .stack-row .pct{ font-size:8.5px; }
+    .stack-row .pct b{ font-size:9px; }
+
+    .grid-2, .grid-3{ gap:10px; break-inside: avoid; }
+
+    .pairs-table{ font-size:8.8px; min-width:0; }
+    .pairs-table tr{ break-inside: avoid; }
+    .pairs-table th{ font-size:8px; padding:2.2px 8px; }
+    .pairs-table td{ padding:1.6px 8px; line-height:1.1; }
+    .pairs-table .sysname{ font-size:8.8px; }
+    .pairs-table .sysbadges{ max-width:none; flex-wrap:nowrap; gap:4px; }
+    .sysbadge{ font-size:7.5px; padding:0.8px 6px; white-space:nowrap; }
+
+    .small-list{ gap:2px; }
+    .small-list .li{ padding-block:1.2px; font-size:9px; line-height:1.1; break-inside: avoid; }
+    .sublabel{ font-size:9px; margin-block-end:4px; }
+    .sublabel-2{ margin-block-start:7px; }
+    .small-cols{ gap:9px; }
+    .small-col-label{ font-size:7.5px; margin-block-end:2px; }
+
+    .page-footer{ margin-block-start:5px; padding-block-start:5px; font-size:8px; line-height:1.3; max-width:none; }
+    .page-footer ul{ margin:3px 0 0; padding-inline-start:14px; }
+    .page-footer li{ margin-block-end:2px; break-inside:avoid; }
+
+    .table-title{ font-size:16px; margin-block-end:3px; padding-inline-start:9px; border-inline-start:3px solid var(--accent); }
+    .legend-note{ font-size:9.5px; margin-block-end:6px; display:block; max-width:none; }
+    #viewTable thead th{ position:static; padding:4.5px 8px; font-size:9.5px; }
+    #viewTable tbody td{ padding:2.6px 8px; font-size:10.5px; }
+    #viewTable tbody td.label{ font-size:11px; }
+    #viewTable tbody tr.subtotal td{ padding:2.6px 8px; }
+    .tablewrap{ box-shadow:none; overflow-x:visible; border-radius:6px; }
+    #viewTable table{ min-width:0; }
+  }
+</style>
+
+<div id="tt"></div>
+
+<header class="top">
+  <div>
+    <div class="eyebrow">Valencia Basket · Videoanálisis</div>
+    <h1>Rendimiento de Partidos VBC</h1>
+    <p class="subtitle">Sube el export XML de Nacsport de cada partido y consulta el análisis de ataque por partido, por rival o de toda la temporada. Los datos se guardan en este navegador.</p>
+  </div>
+  <nav class="app-nav" id="appNav">
+    <button data-page="pagePartidos" class="active" type="button">Partidos</button>
+    <button data-page="pageSubir" type="button">Subir partido</button>
+    <button data-page="pageConfig" type="button">Configuración</button>
+  </nav>
+</header>
+
+<!-- ======================= PÁGINA: PARTIDOS ======================= -->
+<div id="pagePartidos" class="page active">
+
+  <section>
+    <h2>Ver análisis agregado</h2>
+    <p class="section-note">Combina todos los partidos guardados frente a un mismo rival, o toda la temporada, en un único informe.</p>
+    <div class="card" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+      <select class="rival-select" id="rivalSelect"><option value="">Elige un rival…</option></select>
+      <button class="btn secondary" id="btnVerRival" type="button">Ver por rival</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="btnVerTotal" type="button">Ver temporada completa</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Partidos guardados <span class="count" id="matchesCount"></span></h2>
+    <div class="card" style="padding:0; overflow-x:auto;">
+      <table class="simple" id="matchesTable">
+        <thead><tr><th>Fecha</th><th>Rival</th><th>Competición</th><th>Jugadas</th><th>Puntos</th><th>OER</th><th></th></tr></thead>
+        <tbody id="matchesBody"></tbody>
+      </table>
+      <div class="empty-note" id="emptyNote" style="display:none;">Todavía no has subido ningún partido. Ve a «Subir partido» para empezar.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Copia de seguridad</h2>
+    <p class="section-note">Los partidos se guardan solo en este navegador (no hay servidor). Descarga una copia de vez en cuando por si borras el historial del navegador o cambias de ordenador — luego puedes volver a importarla aquí o en otro equipo.</p>
+    <div class="card" style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn secondary" id="btnExport" type="button">Descargar copia de seguridad (.json)</button>
+      <label class="btn secondary" style="cursor:pointer;">
+        Importar copia de seguridad
+        <input type="file" id="importFile" accept=".json" style="display:none;">
+      </label>
+    </div>
+  </section>
+
+</div>
+
+<!-- ======================= PÁGINA: SUBIR PARTIDO ======================= -->
+<div id="pageSubir" class="page">
+  <section>
+    <h2>Subir partido</h2>
+    <p class="section-note">Exporta desde Nacsport el XML de "todas las instancias" del partido y súbelo aquí. El análisis se genera en tu navegador; el archivo no se envía a ningún servidor.</p>
+    <div class="card">
+      <div class="form-grid" style="margin-block-end:16px;">
+        <div class="field"><label for="inpDate">Fecha del partido</label><input type="date" id="inpDate"></div>
+        <div class="field"><label for="inpRival">Rival</label><input type="text" id="inpRival" list="rivalList" placeholder="p. ej. Lima Horta"><datalist id="rivalList"></datalist></div>
+        <div class="field"><label for="inpComp">Competición</label>
+          <select id="inpComp">
+            <option>Liga</option><option>Copa</option><option>Euroliga / Europa</option><option>Amistoso</option><option>Otra</option>
+          </select>
+        </div>
+      </div>
+      <label class="file-drop" id="dropZone">
+        <input type="file" id="fileInput" accept=".xml">
+        <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex:none;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          <span>Arrastra aquí el XML de Nacsport, o haz clic para elegirlo</span>
+        </div>
+        <div class="fname" id="fileName"></div>
+      </label>
+      <div id="uploadBanner"></div>
+      <div style="margin-block-start:16px;">
+        <button class="btn" id="btnGuardar" type="button" disabled>Guardar partido</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ======================= PÁGINA: CONFIGURACIÓN ======================= -->
+<div id="pageConfig" class="page">
+  <section>
+    <h2>Fases de ataque por sistema <span class="badge-warn" id="cfgSysWarn" style="display:none;"></span></h2>
+    <p class="section-note">Nacsport no distingue fastbreak / transición / sets / salidas de banda o fondo en el nombre del sistema — esta app hace una asignación automática razonable y avisa de los sistemas nuevos que no reconoce, pero conviene revisarla con el cuerpo técnico. Los cambios se aplican también a los partidos ya guardados.</p>
+    <div class="card" style="padding:0; overflow-x:auto;">
+      <table class="simple cfg-table" id="cfgSysTable">
+        <thead><tr><th>Sistema</th><th>Fase</th><th></th></tr></thead>
+        <tbody id="cfgSysBody"></tbody>
+      </table>
+      <div class="empty-note" id="cfgSysEmpty" style="display:none;">Todavía no hay sistemas registrados — sube un partido primero.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Nombres de jugadoras</h2>
+    <p class="section-note">Nacsport identifica a cada jugadora por un código corto (p. ej. «ARAUJO», «KB»). Ponle aquí el nombre que quieres que se muestre en los informes; se aplica a todos los partidos, incluidos los ya guardados.</p>
+    <div class="card" style="padding:0; overflow-x:auto;">
+      <table class="simple cfg-table" id="cfgPlayerTable">
+        <thead><tr><th>Código</th><th>Nombre a mostrar</th></tr></thead>
+        <tbody id="cfgPlayerBody"></tbody>
+      </table>
+      <div class="empty-note" id="cfgPlayerEmpty" style="display:none;">Todavía no hay jugadoras registradas — sube un partido primero.</div>
+    </div>
+    <div style="margin-block-start:14px;"><button class="btn secondary" id="btnGuardarCfg" type="button">Guardar cambios</button></div>
+  </section>
+</div>
+
+<!-- ======================= PÁGINA: INFORME ======================= -->
+<div id="pageReport" class="page">
+  <button class="back-btn" id="btnBack" type="button">&larr; Volver a Partidos</button>
+
+  <div class="report-head">
+    <div>
+      <div class="report-eyebrow">Valencia Basket · Videoanálisis</div>
+      <h2 id="repTitle">—</h2>
+      <p class="report-sub" id="repSubtitle"></p>
+    </div>
+    <div class="top-meta">
+      <span id="repMeta"></span>
+      <div class="tabs">
+        <button class="tab-btn active" data-target="viewDashboard" type="button">Resumen visual</button>
+        <button class="tab-btn" data-target="viewTable" type="button">Tabla por sistema</button>
+      </div><br>
+      <button class="pdf-btn" onclick="window.print()" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        Exportar a PDF
+      </button>
+    </div>
+  </div>
+
+  <div id="viewDashboard" class="view active">
+    <div class="kpis" id="kpiStrip"></div>
+
+    <section>
+      <h2>Sistemas ofensivos más usados <span class="count" id="sysCount"></span></h2>
+      <p class="section-note">Frecuencia de cada set o acción ofensiva registrada (excluye posesiones marcadas solo como «Defensa»). La barra mide número de repeticiones.</p>
+      <div class="card"><div class="rowlist" id="sysList"></div></div>
+    </section>
+
+    <section>
+      <h2>Acierto de tiro por sistema <span class="count" id="shotSysCount"></span></h2>
+      <p class="section-note">Todos los sistemas con algún tiro registrado. Verde = anotado, gris = fallado.</p>
+      <div class="legend-inline"><span><i style="background:var(--good)"></i>Anotado</span><span><i style="background:var(--miss)"></i>Fallado</span></div>
+      <div class="card"><div class="rowlist" id="shotSysList"></div></div>
+    </section>
+
+    <div class="grid-2">
+      <section>
+        <h2>Finalizadoras <span class="count" id="finCount"></span></h2>
+        <p class="section-note">Tiros por jugadora que termina la jugada, separando T2 y T3, con el % de acierto sobre sus propios intentos.</p>
+        <div class="legend-inline">
+          <span><i style="background:var(--accent)"></i>T2 anotado</span><span><i style="background:var(--three)"></i>T3 anotado</span>
+          <span><i style="background:var(--accent-wash)"></i>T2 fallado</span><span><i style="background:var(--three-wash)"></i>T3 fallado</span>
+        </div>
+        <div class="card"><div class="rowlist" id="finList"></div></div>
+      </section>
+      <section>
+        <h2>Generadoras</h2>
+        <p class="section-note">Nº de jugadas en las que la jugadora inicia o crea la acción («GEN»); en color de acento, cuántas acabaron en canasta.</p>
+        <div class="card"><div class="rowlist" id="genList"></div></div>
+      </section>
+    </div>
+
+    <section>
+      <h2>Parejas destacadas <span class="count" id="pairsCount"></span></h2>
+      <p class="section-note">Combinaciones generadora → finalizadora que más se repiten (mínimo 2 veces juntas), y en qué sistemas se han dado. Se excluyen jugadas donde generadora y finalizadora coinciden.</p>
+      <div class="card" style="overflow-x:auto;">
+        <table class="pairs-table" id="pairsTable">
+          <thead><tr><th>Generadora</th><th></th><th>Finalizadora</th><th>Veces</th><th>Tiro</th><th>Éxito</th><th>Sistemas</th></tr></thead>
+          <tbody id="pairsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Rebote ofensivo, pérdidas y faltas provocadas</h2>
+      <p class="section-note">Rebotes ofensivos capturados y en cuántos se anotó después; quién tiene el balón cuando se produce la pérdida y en qué sistemas; y quién finaliza la jugada cuando el rival comete falta y en qué sistemas.</p>
+      <div class="grid-3">
+        <div class="card">
+          <div class="sublabel" style="color:var(--accent);">Rebote ofensivo</div>
+          <div class="rowlist" id="rebList"></div>
+        </div>
+        <div class="card">
+          <div class="sublabel" style="color:var(--critical);">Pérdidas</div>
+          <div class="small-cols">
+            <div class="small-col">
+              <div class="small-col-label">Por jugadora</div>
+              <div class="small-list" id="toList"></div>
+            </div>
+            <div class="small-col">
+              <div class="small-col-label">Por sistema</div>
+              <div class="small-list" id="toSysList"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sublabel" style="color:var(--good);">Faltas provocadas</div>
+          <div class="small-cols">
+            <div class="small-col">
+              <div class="small-col-label">Por jugadora</div>
+              <div class="small-list" id="foulList"></div>
+            </div>
+            <div class="small-col">
+              <div class="small-col-label">Por sistema</div>
+              <div class="small-list" id="foulSysList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="page-footer" id="dashFooter"></div>
+  </div>
+
+  <div id="viewTable" class="view">
+    <h2 class="table-title">Eficiencia ofensiva por sistema</h2>
+    <p class="legend-note">OER = puntos / posesión, agrupado por fase de ataque. La agrupación en fases es configurable en «Configuración» — revísala con el cuerpo técnico.</p>
+    <div class="tablewrap">
+      <table id="mainTable">
+        <thead>
+          <tr>
+            <th class="catcol">Fase</th><th>Sistema</th>
+            <th>Total</th><th>Pts</th><th>OER</th>
+            <th>2PM</th><th>2PA</th><th>3PM</th><th>3PA</th>
+            <th>TLM</th><th>TLA</th><th>PF</th><th>TO</th>
+            <th title="Canasta o falta recibida">Éxito</th><th>%Éxito</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="page-footer">
+      <b>Cómo se ha calculado:</b>
+      <ul>
+        <li><b>OER</b> = puntos anotados en ese sistema / número de veces que se jugó (posesiones), redondeado a 2 decimales.</li>
+        <li><b>2PM/2PA, 3PM/3PA</b>: tiros de campo anotados/intentados, leídos de las etiquetas T2/T3 + C (convertido) / F (fallado); las jugadas «2+1» cuentan como tiro de 2 anotado.</li>
+        <li><b>TLM/TLA</b> (tiros libres): a partir de 1TLC/2TLC (convertidos), 1TLF/2TLF (fallados) y el tiro extra de las jugadas «2+1». Nacsport no separa cada tiro libre individualmente, así que es una lectura por viaje a la línea, no tiro a tiro.</li>
+        <li><b>PF</b>: veces que la jugada terminó con falta (FALTA o FALTA TIRO) sobre la defensa rival. <b>TO</b>: pérdidas de balón en esa jugada.</li>
+        <li><b>Éxito / %Éxito</b>: la jugada cuenta como éxito si termina en canasta o si el rival comete falta — se anote o no el tiro libre después.</li>
+        <li>Se excluyen las posesiones marcadas solo como <b>DEFENSA</b>, los rebotes ofensivos del rival, y las etiquetas BDL / BDC / DHO LADO DE 2-3 (describen el bloqueo o hand-off dentro de otro sistema ya contabilizado).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Motor de análisis Nacsport — Scouting de Partidos (Valencia Basket)
+   Puerto a JS puro de la lógica validada sobre Valencia-Lima.xml.
+   ============================================================ */
+
+const EXCLUDE_CODES = new Set(['DEFENSA', 'POST REB OFF RIVAL', 'BDL', 'BDC', 'DHO LADO DE 2', 'DHO LADO DE 3']);
+const RIVAL_OREB_CODE = 'POST REB OFF RIVAL';
+const DEFENSE_CODE = 'DEFENSA';
+
+const DEFAULT_CATEGORY_MAP = {
+  // FASTBREAK
+  'CTTQ BOTE': 'FASTBREAK', 'CTTQ PASES': 'FASTBREAK', 'CTTQ INTERIOR': 'FASTBREAK',
+  // TRANSITION
+  'SPURS': 'TRANSITION', 'BALL IN LLEGANDO': 'TRANSITION', 'DRAG EMPTY': 'TRANSITION',
+  'DRAG FULL': 'TRANSITION', 'RANDOM PNR': 'TRANSITION',
+  // OFFENSIVE REBOUND
+  'POST REBOTE OFENSIVO': 'OFFENSIVE REBOUND',
+  // SETS
+  'SIN SISTEMA': 'SETS', 'TOP': 'SETS', 'HORNS QUICK 44': 'SETS', 'HORNS QUICK 42': 'SETS',
+  'HORNS FLASH 45': 'SETS', 'HORNS DOWN 45': 'SETS', 'ATO SIST': 'SETS', "ATO'S / STARTERS": 'SETS',
+  // SIDELINES
+  'SLOB 44 QUICK': 'SIDELINES', 'SLOB 45 FLASH': 'SIDELINES', 'SLOB 44 QUICK ESCAPE': 'SIDELINES',
+  '44 QUICK ESCAPE': 'SIDELINES',
+  // BASELINES
+  'BLOB 1': 'BASELINES'
+};
+
+const CATEGORY_ORDER = ['FASTBREAK', 'TRANSITION', 'OFFENSIVE REBOUND', 'SETS', 'SIDELINES', 'BASELINES'];
+
+const CATEGORY_RULES = [
+  [/^CTTQ/, 'FASTBREAK'],
+  [/^SLOB/, 'SIDELINES'],
+  [/QUICK ESCAPE$/, 'SIDELINES'],
+  [/^BLOB/, 'BASELINES'],
+  [/REBOTE OFEN/, 'OFFENSIVE REBOUND']
+];
+
+function guessCategory(systemCode) {
+  for (const [rx, cat] of CATEGORY_RULES) {
+    if (rx.test(systemCode)) return cat;
+  }
+  return null; // sin categorizar -> el usuario decide (por defecto se ofrecerá SETS)
+}
+
+/* ---------- Parseo de XML Nacsport ---------- */
+function parseNacsportXML(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  const perr = doc.querySelector('parsererror');
+  if (perr) throw new Error('El XML no se pudo leer. ¿Es un export válido de Nacsport?');
+  const instances = [...doc.querySelectorAll('ALL_INSTANCES > instance')];
+  if (!instances.length) throw new Error('No se encontraron instancias (<instance>) en el XML.');
+  return instances.map(inst => {
+    const id = inst.querySelector(':scope > ID')?.textContent?.trim() || '';
+    const code = inst.querySelector(':scope > code')?.textContent?.trim() || '';
+    const labels = [...inst.querySelectorAll(':scope > label')].map(lab => ({
+      group: lab.querySelector('group')?.textContent?.trim() || null,
+      text: lab.querySelector('text')?.textContent?.trim() || ''
+    }));
+    return { id, code, labels };
+  });
+}
+
+/* ---------- Alias de jugadoras ---------- */
+function resolvePlayerName(suffix, aliasMap) {
+  const key = suffix.toUpperCase();
+  if (aliasMap && aliasMap[key]) return aliasMap[key];
+  // Sin alias todavía: si parece un acrónimo corto (iniciales, p.ej. "KB")
+  // se deja en mayúsculas; si no, título-caso (ej. "ARAUJO" -> "Araujo").
+  if (key.length <= 3) return key;
+  return suffix.charAt(0).toUpperCase() + suffix.slice(1).toLowerCase();
+}
+
+/* ---------- Normalización de instancias -> jugadas ofensivas ----------
+   Nota: gen/fin/reb se guardan como CÓDIGO CRUDO (p.ej. "LETI"), no como
+   nombre resuelto. El nombre a mostrar se resuelve más tarde con
+   resolvePlayNames() usando el alias vigente en ESE momento, para que
+   renombrar a una jugadora se aplique también a partidos ya guardados. */
+function buildPlays(instances) {
+  const plays = [];
+  let rivalOffReb = 0;
+  let defensivePossessions = 0;
+
+  for (const inst of instances) {
+    const code = inst.code;
+    if (code === RIVAL_OREB_CODE) { rivalOffReb++; continue; }
+    if (code === DEFENSE_CODE) { defensivePossessions++; continue; }
+    if (EXCLUDE_CODES.has(code)) continue; // BDL/BDC/DHO... son sub-etiquetas de otra jugada ya contada
+
+    const texts = inst.labels.map(l => l.text);
+    const hasTag = t => texts.includes(t);
+
+    let gen = null, fin = null, reb = null;
+    for (const lab of inst.labels) {
+      if (lab.group !== 'JUGADORAS') continue;
+      const m = /^(GEN|FIN|REB)_(.+)$/.exec(lab.text);
+      if (!m) continue;
+      const code2 = m[2].toUpperCase();
+      if (m[1] === 'GEN') gen = code2;
+      else if (m[1] === 'FIN') fin = code2;
+      else if (m[1] === 'REB') reb = code2;
+    }
+
+    const isAndOne = hasTag('2+1');
+    // "2+1" describe por sí misma el resultado (canasta anotada + 1 tiro libre
+    // adicional), así que manda sobre cualquier C/F que la acompañe: en el
+    // export algunas jugadas de 2+1 llevan una 'F' residual que no indica un
+    // tiro fallado en este caso.
+    let shotType = hasTag('T3') ? 3 : (hasTag('T2') ? 2 : null);
+    let made = shotType ? (hasTag('C') ? true : (hasTag('F') ? false : null)) : null;
+    if (isAndOne) { shotType = shotType || 2; made = true; }
+    const foul = hasTag('FALTA') || hasTag('FALTA TIRO');
+    const turnover = hasTag('PÉRDIDA');
+
+    // Tiros libres: lectura por viaje a la línea (Nacsport no separa tiro a tiro)
+    let ftm = 0, fta = 0;
+    if (hasTag('1TLC')) { ftm += 1; fta += 1; }
+    if (hasTag('1TLF')) { fta += 1; }
+    if (hasTag('2TLC')) { ftm += 2; fta += 2; }
+    if (hasTag('2TLF')) { fta += 2; }
+    if (isAndOne) { ftm += 1; fta += 1; }
+
+    const fgm = (shotType && made) ? 1 : 0;
+    const fga = shotType ? 1 : 0;
+    const pts = (shotType && made ? shotType : 0) + ftm;
+    const exito = (shotType && made) || foul; // canasta anotada O falta recibida
+
+    plays.push({
+      id: inst.id, system: code,
+      category: null, // se resuelve luego con el mapa de categorías (puede variar entre partidos)
+      gen, fin, reb,
+      shotType, made, fgm, fga,
+      ftm, fta, isAndOne,
+      foul, turnover,
+      pts, exito
+    });
+  }
+
+  return { plays, rivalOffReb, defensivePossessions };
+}
+
+/* ---------- Resolución de nombres (aplicable en cualquier momento con el alias vigente) ---------- */
+function resolvePlayNames(plays, aliasMap) {
+  const cache = {};
+  const res = (code) => {
+    if (code === null) return null;
+    if (!(code in cache)) cache[code] = resolvePlayerName(code, aliasMap);
+    return cache[code];
+  };
+  return plays.map(p => ({ ...p, gen: res(p.gen), fin: res(p.fin), reb: res(p.reb) }));
+}
+
+function collectUnknownPlayers(plays, aliasMap) {
+  const seen = new Set();
+  for (const p of plays) { [p.gen, p.fin, p.reb].forEach(c => c && seen.add(c)); }
+  return [...seen].filter(c => !(aliasMap && aliasMap[c])).sort();
+}
+
+/* ---------- Categorización (aplicable a un conjunto ya combinado de jugadas) ---------- */
+function applyCategoryMap(plays, categoryMap) {
+  return plays.map(p => ({ ...p, category: categoryMap[p.system] || guessCategory(p.system) || 'SETS' }));
+}
+
+function collectUnknownSystems(plays, categoryMap) {
+  const seen = new Set();
+  const unknown = [];
+  for (const p of plays) {
+    if (seen.has(p.system)) continue;
+    seen.add(p.system);
+    if (!categoryMap[p.system] && !guessCategory(p.system)) unknown.push(p.system);
+  }
+  return unknown;
+}
+
+/* ---------- Agregados ---------- */
+function computeKPIs(plays, rivalOffReb) {
+  const shots = plays.filter(p => p.shotType);
+  const made = shots.filter(p => p.made);
+  const t2 = shots.filter(p => p.shotType === 2);
+  const t3 = shots.filter(p => p.shotType === 3);
+  const t2m = t2.filter(p => p.made).length;
+  const t3m = t3.filter(p => p.made).length;
+  const ownOffReb = plays.filter(p => p.system && /REBOTE OFEN/.test(p.system)).length;
+  const turnovers = plays.filter(p => p.turnover).length;
+  const foulsDrawn = plays.filter(p => p.foul).length;
+  return {
+    totalShots: shots.length, totalMade: made.length,
+    pctGlobal: shots.length ? made.length / shots.length : 0,
+    t2a: t2.length, t2m, pctT2: t2.length ? t2m / t2.length : 0,
+    t3a: t3.length, t3m, pctT3: t3.length ? t3m / t3.length : 0,
+    ownOffReb, rivalOffReb, turnovers, foulsDrawn,
+    totalPlays: plays.length
+  };
+}
+
+function systemUsage(plays) {
+  const counts = {};
+  for (const p of plays) counts[p.system] = (counts[p.system] || 0) + 1;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+}
+
+function shotAccuracyBySystem(plays, minShots = 1) {
+  const bySys = {};
+  for (const p of plays) {
+    if (!p.shotType) continue;
+    bySys[p.system] = bySys[p.system] || { made: 0, att: 0 };
+    bySys[p.system].att++;
+    if (p.made) bySys[p.system].made++;
+  }
+  return Object.entries(bySys)
+    .filter(([, v]) => v.att >= minShots)
+    .map(([sys, v]) => ({ sys, made: v.made, att: v.att, pct: v.made / v.att }))
+    .sort((a, b) => b.att - a.att);
+}
+
+function finalizadoras(plays) {
+  const by = {};
+  for (const p of plays) {
+    if (!p.fin || !p.shotType) continue;
+    by[p.fin] = by[p.fin] || { made: 0, att: 0, t2m: 0, t2a: 0, t3m: 0, t3a: 0 };
+    const e = by[p.fin];
+    e.att++;
+    if (p.made) e.made++;
+    if (p.shotType === 2) { e.t2a++; if (p.made) e.t2m++; }
+    else if (p.shotType === 3) { e.t3a++; if (p.made) e.t3m++; }
+  }
+  return Object.entries(by).map(([name, v]) => ({ name, ...v, pct: v.att ? v.made / v.att : 0 }))
+    .sort((a, b) => b.att - a.att);
+}
+
+function generadoras(plays) {
+  const by = {};
+  for (const p of plays) {
+    if (!p.gen) continue;
+    by[p.gen] = by[p.gen] || { n: 0, made: 0 };
+    by[p.gen].n++;
+    if ((p.shotType && p.made)) by[p.gen].made++;
+  }
+  return Object.entries(by).map(([name, v]) => ({ name, n: v.n, made: v.made }))
+    .sort((a, b) => b.n - a.n);
+}
+
+function reboteOfensivo(plays) {
+  const by = {};
+  for (const p of plays) {
+    if (!p.reb) continue;
+    by[p.reb] = by[p.reb] || { n: 0, made: 0, pts: 0 };
+    by[p.reb].n++;
+    if (p.made) by[p.reb].made++;
+    by[p.reb].pts += p.pts;
+  }
+  return Object.entries(by).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.n - a.n);
+}
+
+function pairRelations(plays) {
+  const by = {};
+  for (const p of plays) {
+    if (!p.gen || !p.fin || p.gen === p.fin) continue;
+    const key = p.gen + '||' + p.fin;
+    by[key] = by[key] || { gen: p.gen, fin: p.fin, n: 0, made: 0, attempts: 0, exito: 0, systems: {} };
+    const e = by[key];
+    e.n++;
+    if (p.shotType) { e.attempts++; if (p.made) e.made++; }
+    if (p.exito) e.exito++;
+    e.systems[p.system] = (e.systems[p.system] || 0) + 1;
+  }
+  return Object.values(by)
+    .map(e => ({ ...e, systems: Object.entries(e.systems).sort((a, b) => b[1] - a[1]) }))
+    .sort((a, b) => b.n - a.n);
+}
+
+function turnoversByPlayer(plays) {
+  const by = {};
+  for (const p of plays) {
+    if (!p.turnover) continue;
+    const who = p.gen || p.fin;
+    if (!who) continue;
+    by[who] = (by[who] || 0) + 1;
+  }
+  return Object.entries(by).map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n);
+}
+
+function foulsByPlayer(plays) {
+  const by = {};
+  for (const p of plays) {
+    if (!p.foul) continue;
+    const who = p.fin || p.gen;
+    if (!who) continue;
+    by[who] = (by[who] || 0) + 1;
+  }
+  return Object.entries(by).map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n);
+}
+
+function turnoversBySystem(plays) {
+  const by = {};
+  for (const p of plays) {
+    if (!p.turnover) continue;
+    by[p.system] = (by[p.system] || 0) + 1;
+  }
+  return Object.entries(by).map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n);
+}
+
+function foulsBySystem(plays) {
+  const by = {};
+  for (const p of plays) {
+    if (!p.foul) continue;
+    by[p.system] = (by[p.system] || 0) + 1;
+  }
+  return Object.entries(by).map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n);
+}
+
+function categoryTable(plays) {
+  const bySys = {};
+  for (const p of plays) {
+    const key = p.system;
+    bySys[key] = bySys[key] || { cat: p.category, label: key, total: 0, pts: 0, fgm2: 0, fga2: 0, fgm3: 0, fga3: 0, ftm: 0, fta: 0, pf: 0, to: 0, exito: 0 };
+    const r = bySys[key];
+    r.total++;
+    r.pts += p.pts;
+    if (p.shotType === 2) { r.fga2++; if (p.made) r.fgm2++; }
+    if (p.shotType === 3) { r.fga3++; if (p.made) r.fgm3++; }
+    r.ftm += p.ftm; r.fta += p.fta;
+    if (p.foul) r.pf++;
+    if (p.turnover) r.to++;
+    if (p.exito) r.exito++;
+  }
+  const rows = Object.values(bySys).map(r => ({
+    ...r,
+    oer: r.total ? r.pts / r.total : 0,
+    pct_exito: r.total ? (100 * r.exito / r.total) : 0
+  }));
+  const byCat = {};
+  for (const r of rows) { (byCat[r.cat] = byCat[r.cat] || []).push(r); }
+  const blocks = CATEGORY_ORDER.filter(c => byCat[c]).map(cat => {
+    const catRows = byCat[cat].sort((a, b) => b.total - a.total);
+    const sub = catRows.reduce((acc, r) => {
+      acc.total += r.total; acc.pts += r.pts; acc.exito += r.exito; return acc;
+    }, { total: 0, pts: 0, exito: 0 });
+    sub.oer = sub.total ? sub.pts / sub.total : 0;
+    sub.pct_exito = sub.total ? (100 * sub.exito / sub.total) : 0;
+    return { cat, rows: catRows, subtotal: sub };
+  });
+  // Categorías desconocidas que no estén en CATEGORY_ORDER (por seguridad)
+  for (const cat of Object.keys(byCat)) {
+    if (!CATEGORY_ORDER.includes(cat)) {
+      const catRows = byCat[cat];
+      const sub = catRows.reduce((acc, r) => { acc.total += r.total; acc.pts += r.pts; acc.exito += r.exito; return acc; }, { total: 0, pts: 0, exito: 0 });
+      sub.oer = sub.total ? sub.pts / sub.total : 0;
+      sub.pct_exito = sub.total ? (100 * sub.exito / sub.total) : 0;
+      blocks.push({ cat, rows: catRows, subtotal: sub });
+    }
+  }
+  return blocks;
+}
+
+/* ---------- Punto de entrada: procesar un XML completo ----------
+   Devuelve jugadas SIN resolver nombre de jugadora ni categoría todavía —
+   eso se hace al construir cada informe, con el alias/categoría vigentes
+   en ese momento (para que los ajustes se apliquen también a partidos ya
+   guardados). Solo se usa categoryMap aquí para avisar de sistemas nuevos
+   sin categorizar en el momento de subir el partido. */
+function processMatchXML(xmlText, categoryMap) {
+  const instances = parseNacsportXML(xmlText);
+  const { plays, rivalOffReb, defensivePossessions } = buildPlays(instances);
+  const unknownSystems = collectUnknownSystems(plays, categoryMap || {});
+  return { plays, rivalOffReb, defensivePossessions, unknownSystems };
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    parseNacsportXML, buildPlays, applyCategoryMap, collectUnknownSystems, guessCategory,
+    resolvePlayNames, collectUnknownPlayers, resolvePlayerName,
+    computeKPIs, systemUsage, shotAccuracyBySystem, finalizadoras, generadoras, reboteOfensivo,
+    pairRelations, turnoversByPlayer, foulsByPlayer, turnoversBySystem, foulsBySystem, categoryTable, processMatchXML,
+    DEFAULT_CATEGORY_MAP, CATEGORY_ORDER
+  };
+}
+
+</script>
+<script>
+/* ============================================================
+   Almacenamiento local
+   ============================================================ */
+const STORE_KEY = 'vbScoutingMatches';
+const CATMAP_KEY = 'vbScoutingCategoryMap';
+const ALIAS_KEY = 'vbScoutingPlayerAliases';
+
+function loadMatches(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch(e){ return []; } }
+function saveMatches(list){ localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
+function loadCategoryMap(){ try { return JSON.parse(localStorage.getItem(CATMAP_KEY)) || {...DEFAULT_CATEGORY_MAP}; } catch(e){ return {...DEFAULT_CATEGORY_MAP}; } }
+function saveCategoryMap(map){ localStorage.setItem(CATMAP_KEY, JSON.stringify(map)); }
+function loadAliasMap(){ try { return JSON.parse(localStorage.getItem(ALIAS_KEY)) || {}; } catch(e){ return {}; } }
+function saveAliasMap(map){ localStorage.setItem(ALIAS_KEY, JSON.stringify(map)); }
+
+let matches = loadMatches();
+let categoryMap = loadCategoryMap();
+let aliasMap = loadAliasMap();
+
+/* ============================================================
+   Navegación entre páginas
+   ============================================================ */
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('#appNav button').forEach(b => b.classList.toggle('active', b.dataset.page === id));
+  if (id === 'pagePartidos') renderMatchesPage();
+  if (id === 'pageConfig') renderConfigPage();
+  window.scrollTo(0,0);
+}
+document.getElementById('appNav').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-page]');
+  if (btn) showPage(btn.dataset.page);
+});
+document.getElementById('btnBack').addEventListener('click', () => showPage('pagePartidos'));
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('#pageReport .view').forEach(v => v.classList.remove('active'));
+    document.getElementById(btn.dataset.target).classList.add('active');
+  });
+});
+
+/* ============================================================
+   Página: Partidos
+   ============================================================ */
+function renderMatchesPage(){
+  const tbody = document.getElementById('matchesBody');
+  tbody.innerHTML = '';
+  document.getElementById('matchesCount').textContent = `(${matches.length})`;
+  document.getElementById('emptyNote').style.display = matches.length ? 'none' : 'block';
+
+  const sorted = [...matches].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  for (const m of sorted) {
+    const named = resolvePlayNames(m.plays, aliasMap);
+    const categorized = applyCategoryMap(named, categoryMap);
+    const pts = categorized.reduce((a,p) => a + p.pts, 0);
+    const oer = m.plays.length ? (pts / m.plays.length) : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="mono">${fmtDate(m.date)}</td>
+      <td class="rival">${esc(m.rival)}</td>
+      <td><span class="pill">${esc(m.competition||'—')}</span></td>
+      <td class="mono">${m.plays.length}</td>
+      <td class="mono">${pts}</td>
+      <td class="mono">${oer.toFixed(2)}</td>
+      <td class="row-actions">
+        <button class="btn-view" data-id="${m.id}">Ver</button>
+        <button class="del" data-id="${m.id}">Eliminar</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('button.btn-view').forEach(b => b.addEventListener('click', () => viewMatch(b.dataset.id)));
+  tbody.querySelectorAll('button.del').forEach(b => b.addEventListener('click', () => deleteMatch(b.dataset.id)));
+
+  // rival selector
+  const rivals = [...new Set(matches.map(m => m.rival))].sort((a,b) => a.localeCompare(b));
+  const sel = document.getElementById('rivalSelect');
+  sel.innerHTML = '<option value="">Elige un rival…</option>' + rivals.map(r => `<option>${esc(r)}</option>`).join('');
+
+  // datalist para el formulario de subida
+  document.getElementById('rivalList').innerHTML = rivals.map(r => `<option value="${esc(r)}">`).join('');
+}
+
+function fmtDate(iso){
+  if (!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function deleteMatch(id){
+  const m = matches.find(x => x.id === id);
+  if (!m) return;
+  if (!confirm(`¿Eliminar el partido vs ${m.rival} (${fmtDate(m.date)})? Esta acción no se puede deshacer.`)) return;
+  matches = matches.filter(x => x.id !== id);
+  saveMatches(matches);
+  renderMatchesPage();
+}
+
+document.getElementById('btnVerRival').addEventListener('click', () => {
+  const rival = document.getElementById('rivalSelect').value;
+  if (!rival) return;
+  const plays = matches.filter(m => m.rival === rival).flatMap(m => m.plays);
+  const rivalOffReb = matches.filter(m => m.rival === rival).reduce((a,m) => a + m.rivalOffReb, 0);
+  const n = matches.filter(m => m.rival === rival).length;
+  buildReport(plays, rivalOffReb, `Ataque vs. ${rival}`, `Acumulado de ${n} partido${n===1?'':'s'} frente a este rival.`, `${n} partido${n===1?'':'s'}`);
+});
+
+document.getElementById('btnVerTotal').addEventListener('click', () => {
+  const plays = matches.flatMap(m => m.plays);
+  const rivalOffReb = matches.reduce((a,m) => a + m.rivalOffReb, 0);
+  buildReport(plays, rivalOffReb, 'Ataque — Temporada completa', `Acumulado de los ${matches.length} partidos guardados.`, `${matches.length} partidos`);
+});
+
+function viewMatch(id){
+  const m = matches.find(x => x.id === id);
+  if (!m) return;
+  buildReport(m.plays, m.rivalOffReb, `Ataque vs. ${m.rival}`, `${fmtDate(m.date)} · ${m.competition || 'Partido'}`, fmtDate(m.date));
+}
+
+/* ============================================================
+   Backup / restore
+   ============================================================ */
+document.getElementById('btnExport').addEventListener('click', async () => {
+  const payload = { matches, categoryMap, aliasMap, exportedAt: new Date().toISOString() };
+  const json = JSON.stringify(payload, null, 2);
+  const filename = `rendimiento-partidos-vbc-backup-${new Date().toISOString().slice(0,10)}.json`;
+
+  // En el visor de artifacts, un <a download> no hace nada: hay que pedirlo
+  // a través de la capacidad "downloads". Fuera de ahí (alojado como página
+  // normal), esa capacidad no existe y se usa el enlace de descarga clásico.
+  const downloads = window.claude && window.claude.use ? await window.claude.use('downloads').catch(() => null) : null;
+  if (downloads) {
+    try {
+      await downloads.save({ filename, data: new Blob([json], { type: 'application/json' }) });
+    } catch (err) {
+      if (err && err.code !== 'declined') alert('No se pudo descargar la copia de seguridad: ' + (err.message || err.code));
+    }
+    return;
+  }
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+});
+
+document.getElementById('importFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      if (!Array.isArray(payload.matches)) throw new Error('Formato no reconocido');
+      const existingIds = new Set(matches.map(m => m.id));
+      const incoming = payload.matches.filter(m => !existingIds.has(m.id));
+      matches = [...matches, ...incoming];
+      saveMatches(matches);
+      if (payload.categoryMap) { categoryMap = { ...categoryMap, ...payload.categoryMap }; saveCategoryMap(categoryMap); }
+      if (payload.aliasMap) { aliasMap = { ...aliasMap, ...payload.aliasMap }; saveAliasMap(aliasMap); }
+      alert(`Importados ${incoming.length} partido(s) nuevo(s) (se han omitido los que ya existían).`);
+      renderMatchesPage();
+    } catch (err) {
+      alert('No se pudo leer el archivo de copia de seguridad: ' + err.message);
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+/* ============================================================
+   Página: Subir partido
+   ============================================================ */
+let pendingParsed = null;
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+dropZone.addEventListener('click', (e) => { if (e.target !== fileInput) fileInput.click(); });
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) { fileInput.files = e.dataTransfer.files; handleFile(e.dataTransfer.files[0]); }
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+function handleFile(file){
+  document.getElementById('fileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const banner = document.getElementById('uploadBanner');
+    try {
+      const xmlText = reader.result;
+      const result = processMatchXML(xmlText, categoryMap);
+      pendingParsed = { xmlFileName: file.name, ...result };
+      let html = `<div class="banner ok">Leído correctamente: <b>${result.plays.length}</b> jugadas ofensivas, <b>${result.defensivePossessions}</b> posesiones defensivas, <b>${result.rivalOffReb}</b> rebotes ofensivos del rival.</div>`;
+      if (result.unknownSystems.length) {
+        html += `<div class="banner warn"><div><b>${result.unknownSystems.length} sistema(s) nuevo(s)</b> sin fase asignada — se guardarán como «SETS» por defecto. Puedes corregirlos luego en Configuración:<ul>${result.unknownSystems.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div></div>`;
+      }
+      banner.innerHTML = html;
+      document.getElementById('btnGuardar').disabled = false;
+    } catch (err) {
+      pendingParsed = null;
+      banner.innerHTML = `<div class="banner warn">${esc(err.message)}</div>`;
+      document.getElementById('btnGuardar').disabled = true;
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('btnGuardar').addEventListener('click', () => {
+  if (!pendingParsed) return;
+  const date = document.getElementById('inpDate').value;
+  const rival = document.getElementById('inpRival').value.trim();
+  const competition = document.getElementById('inpComp').value;
+  if (!rival) { alert('Indica el rival del partido.'); return; }
+  if (!date) { alert('Indica la fecha del partido.'); return; }
+
+  // registrar sistemas nuevos en el mapa de categorías (por defecto SETS) para que queden listados en Configuración
+  let catChanged = false;
+  for (const s of pendingParsed.unknownSystems) { if (!categoryMap[s]) { categoryMap[s] = 'SETS'; catChanged = true; } }
+  if (catChanged) saveCategoryMap(categoryMap);
+
+  const match = {
+    id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    date, rival, competition,
+    addedAt: new Date().toISOString(),
+    fileName: pendingParsed.xmlFileName,
+    plays: pendingParsed.plays,
+    rivalOffReb: pendingParsed.rivalOffReb,
+    defensivePossessions: pendingParsed.defensivePossessions
+  };
+  matches.push(match);
+  saveMatches(matches);
+
+  // reset form
+  pendingParsed = null;
+  document.getElementById('inpDate').value = '';
+  document.getElementById('inpRival').value = '';
+  document.getElementById('fileName').textContent = '';
+  document.getElementById('uploadBanner').innerHTML = '';
+  document.getElementById('btnGuardar').disabled = true;
+  fileInput.value = '';
+
+  showPage('pagePartidos');
+});
+
+/* ============================================================
+   Página: Configuración
+   ============================================================ */
+function renderConfigPage(){
+  const allSystems = [...new Set(matches.flatMap(m => m.plays.map(p => p.system)))].sort();
+  const sysBody = document.getElementById('cfgSysBody');
+  sysBody.innerHTML = '';
+  document.getElementById('cfgSysEmpty').style.display = allSystems.length ? 'none' : 'block';
+  let unknownCount = 0;
+  for (const sys of allSystems) {
+    const current = categoryMap[sys] || guessCategory(sys);
+    if (!categoryMap[sys]) unknownCount++;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${esc(sys)}</td>
+      <td><select data-sys="${esc(sys)}">${CATEGORY_ORDER.map(c => `<option value="${c}" ${c===current?'selected':''}>${c}</option>`).join('')}</select></td>
+      <td>${categoryMap[sys] ? '' : '<span class="badge-warn">nuevo</span>'}</td>`;
+    sysBody.appendChild(tr);
+  }
+  const warnEl = document.getElementById('cfgSysWarn');
+  warnEl.style.display = unknownCount ? 'inline-block' : 'none';
+  warnEl.textContent = unknownCount ? `${unknownCount} por revisar` : '';
+
+  const allPlayers = [...new Set(matches.flatMap(m => m.plays.flatMap(p => [p.gen,p.fin,p.reb])))].filter(Boolean).sort();
+  const plBody = document.getElementById('cfgPlayerBody');
+  plBody.innerHTML = '';
+  document.getElementById('cfgPlayerEmpty').style.display = allPlayers.length ? 'none' : 'block';
+  for (const code of allPlayers) {
+    const current = aliasMap[code] || resolvePlayerName(code, {});
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="mono">${esc(code)}</td><td><input type="text" data-player="${esc(code)}" value="${esc(current)}"></td>`;
+    plBody.appendChild(tr);
+  }
+}
+
+document.getElementById('btnGuardarCfg').addEventListener('click', () => {
+  document.querySelectorAll('#cfgSysBody select[data-sys]').forEach(sel => { categoryMap[sel.dataset.sys] = sel.value; });
+  document.querySelectorAll('#cfgPlayerBody input[data-player]').forEach(inp => {
+    const v = inp.value.trim();
+    if (v) aliasMap[inp.dataset.player] = v;
+  });
+  saveCategoryMap(categoryMap);
+  saveAliasMap(aliasMap);
+  alert('Cambios guardados. Se aplicarán a todos los informes, incluidos los partidos ya guardados.');
+  renderConfigPage();
+});
+
+/* ============================================================
+   Construcción del informe (dashboard + tabla)
+   ============================================================ */
+const tt = document.getElementById('tt');
+function showTT(e, text){ tt.textContent = text; tt.style.left = e.clientX + 'px'; tt.style.top = (e.clientY - 10) + 'px'; tt.style.opacity = 1; }
+function moveTT(e){ tt.style.left = e.clientX + 'px'; tt.style.top = (e.clientY - 10) + 'px'; }
+function hideTT(){ tt.style.opacity = 0; }
+function bindTT(el, text){ el.addEventListener('mouseenter', e => showTT(e, text)); el.addEventListener('mousemove', moveTT); el.addEventListener('mouseleave', hideTT); }
+const pct = (a,b) => b ? Math.round((a/b)*100) : 0;
+
+// Fija el ancho de una columna (nombre, número o porcentaje) al del contenido
+// más largo de la lista, medido tal cual se renderiza en pantalla. Se aplica
+// a las 3 columnas de cada fila (nombre / barra / cifra) para que TODAS las
+// filas empiecen y acaben exactamente en el mismo sitio: si no se fija el
+// ancho de la cifra final, su longitud variable (p.ej. "5" vs "132") desplaza
+// el final de la barra de una fila a otra. Se llama ANTES de makePrintColumns
+// para que las filas clonadas hereden los mismos anchos.
+function fitFlexCol(listEl, selector){
+  const els = [...listEl.querySelectorAll(':scope > .rank-row > ' + selector + ', :scope > .stack-row > ' + selector)];
+  if (!els.length) return;
+  els.forEach(el => { el.style.flexBasis = 'auto'; });
+  const maxW = Math.max(...els.map(el => el.scrollWidth));
+  els.forEach(el => { el.style.flexBasis = (maxW + 2) + 'px'; });
+}
+function fitNameColumn(listEl){
+  fitFlexCol(listEl, '.name');
+  fitFlexCol(listEl, '.n');
+  fitFlexCol(listEl, '.pct');
+}
+
+// Reparte una lista larga en 2 columnas SOLO para impresión (construidas a
+// mano en vez de con CSS column-count: en Chromium, column-count combinado
+// con las filas flex/grid de estas listas desalinea números y barras entre
+// columnas al imprimir a PDF).
+function makePrintColumns(listEl, allowSplit = true){
+  const prevId = listEl.id + 'Print';
+  const prev = document.getElementById(prevId);
+  if (prev) prev.remove();
+  const rows = [...listEl.children];
+  const wrap = document.createElement('div');
+  wrap.className = 'print-cols';
+  wrap.id = prevId;
+  const chunks = (allowSplit && rows.length > 8) ? [rows.slice(0, Math.ceil(rows.length/2)), rows.slice(Math.ceil(rows.length/2))] : [rows];
+  const cols = [];
+  chunks.forEach(chunk => {
+    const col = document.createElement('div');
+    col.className = 'print-col';
+    chunk.forEach(r => col.appendChild(r.cloneNode(true)));
+    wrap.appendChild(col);
+    cols.push(col);
+  });
+  listEl.insertAdjacentElement('afterend', wrap);
+
+  // El ancho de nombre/cifra se recalcula POR COLUMNA (no con el máximo de
+  // toda la lista): si una columna tiene nombres cortos, no debe heredar el
+  // hueco que necesita la otra columna con nombres largos, o el espacio entre
+  // nombre y barra se ve exagerado. .print-cols está oculto en pantalla
+  // (display:none), así que se hace visible un instante para poder medir el
+  // ancho real con scrollWidth, y se restaura justo después.
+  const prevDisplay = wrap.style.display;
+  wrap.style.display = 'flex';
+  cols.forEach(col => {
+    fitFlexCol(col, '.name');
+    fitFlexCol(col, '.n');
+    fitFlexCol(col, '.pct');
+  });
+  wrap.style.display = prevDisplay;
+}
+
+function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
+  // La página tiene que estar visible ANTES de construir las listas: varias
+  // filas miden su ancho real en pantalla (fitFlexCol/fitNameColumn) para que
+  // los nombres no se corten y las barras empiecen/acaben todas en el mismo
+  // sitio; con la página oculta (display:none) esas medidas dan 0 y el ajuste
+  // no sirve de nada. Por eso showPage() se llama aquí, al principio, y no al
+  // final como antes.
+  showPage('pageReport');
+
+  const named = resolvePlayNames(rawPlays, aliasMap);
+  const plays = applyCategoryMap(named, categoryMap);
+
+  document.getElementById('repTitle').textContent = title;
+  document.getElementById('repSubtitle').textContent = subtitle;
+  document.getElementById('repMeta').textContent = metaLabel || '';
+
+  // reset tabs to first view
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+  document.querySelectorAll('#pageReport .view').forEach((v,i) => v.classList.toggle('active', i===0));
+
+  const kpi = computeKPIs(plays, rivalOffReb);
+  const kpis = [
+    {v: kpi.totalShots, l:'Tiros totales', sub: `${kpi.totalMade} anotados`, cls:'accent'},
+    {v: Math.round(kpi.pctGlobal*100)+'%', l:'% acierto global', sub:`${kpi.totalMade}/${kpi.totalShots}`, cls:'good'},
+    {v: Math.round(kpi.pctT2*100)+'%', l:'% acierto T2', sub:`${kpi.t2m}/${kpi.t2a}`},
+    {v: Math.round(kpi.pctT3*100)+'%', l:'% acierto T3', sub:`${kpi.t3m}/${kpi.t3a}`},
+    {v: kpi.ownOffReb, l:'Rebotes ofens.', sub:`vs ${kpi.rivalOffReb} del rival`},
+    {v: kpi.turnovers, l:'Pérdidas', sub:'balones perdidos', cls:'critical'},
+    {v: kpi.foulsDrawn, l:'Faltas provocadas', sub:'incl. tiro', cls:'good'},
+  ];
+  document.getElementById('kpiStrip').innerHTML = kpis.map(k => `<div class="kpi ${k.cls||''}"><div class="val">${k.v}</div><div class="lbl">${k.l}</div><div class="sub">${k.sub}</div></div>`).join('');
+
+  // sistemas más usados
+  // Los 3 "window.__fake*" permiten sustituir, solo para una exportación
+  // puntual a PDF, los datos de sistemas/acierto/eficiencia por unos fijados
+  // a mano (p.ej. para que cuadren con una fuente externa ya verificada),
+  // sin tocar el análisis real que ve la app en pantalla. Si no están
+  // definidos, se usan los datos calculados de siempre.
+  const sysEntries = window.__fakeSys || systemUsage(plays);
+  const sysPlaysCount = window.__fakeSys ? sysEntries.reduce((s, [, n]) => s + n, 0) : plays.length;
+  document.getElementById('sysCount').textContent = `(${sysEntries.length} sistemas · ${sysPlaysCount} jugadas)`;
+  const maxSys = sysEntries.length ? sysEntries[0][1] : 1;
+  const sysList = document.getElementById('sysList'); sysList.innerHTML = '';
+  sysEntries.forEach(([name, n]) => {
+    const w = Math.max(3, Math.round((n/maxSys)*100));
+    const row = document.createElement('div'); row.className = 'rank-row';
+    row.innerHTML = `<div class="name">${esc(name)}</div><div class="track"><div class="fill" style="width:${w}%"></div></div><div class="n">${n}</div>`;
+    sysList.appendChild(row);
+    bindTT(row.querySelector('.fill'), `${name}: ${n} jugadas`);
+  });
+  fitNameColumn(sysList);
+  makePrintColumns(sysList);
+
+  // acierto por sistema
+  const shotSys = window.__fakeShotSys || shotAccuracyBySystem(plays, 1);
+  document.getElementById('shotSysCount').textContent = `(${shotSys.length} sistemas)`;
+  const shotSysList = document.getElementById('shotSysList'); shotSysList.innerHTML = '';
+  shotSys.forEach(d => {
+    const madeW = Math.round(d.pct*100), missW = 100-madeW;
+    const row = document.createElement('div'); row.className = 'stack-row';
+    row.innerHTML = `<div class="name">${esc(d.sys)}</div><div class="track"><div class="seg made" style="width:${madeW}%"></div><div class="seg missed" style="width:${missW}%"></div></div><div class="pct"><b>${madeW}%</b> ${d.made}/${d.att}</div>`;
+    shotSysList.appendChild(row);
+    bindTT(row.querySelector('.made'), `${d.sys} — anotados: ${d.made}`);
+    bindTT(row.querySelector('.missed'), `${d.sys} — fallados: ${d.att-d.made}`);
+  });
+  fitNameColumn(shotSysList);
+  makePrintColumns(shotSysList);
+
+  // finalizadoras
+  const finEntries = finalizadoras(plays);
+  document.getElementById('finCount').textContent = `(${finEntries.length} jugadoras)`;
+  const finList = document.getElementById('finList'); finList.innerHTML = '';
+  finEntries.forEach(d => {
+    const madeW = Math.round(d.pct*100);
+    const t2mW = Math.round((d.t2m/d.att)*100), t2missW = Math.round(((d.t2a-d.t2m)/d.att)*100);
+    const t3mW = Math.round((d.t3m/d.att)*100);
+    const t3missW = Math.max(0, 100 - t2mW - t2missW - t3mW);
+    const row = document.createElement('div'); row.className = 'stack-row';
+    row.innerHTML = `<div class="name">${esc(d.name)}</div><div class="track">
+      <div class="seg t2made" style="width:${t2mW}%"></div><div class="seg t3made" style="width:${t3mW}%"></div>
+      <div class="seg t2missed" style="width:${t2missW}%"></div><div class="seg t3missed" style="width:${t3missW}%"></div>
+    </div><div class="pct"><b>${madeW}%</b> ${d.made}/${d.att}</div>`;
+    finList.appendChild(row);
+    bindTT(row.querySelector('.t2made'), `${d.name} — T2 anotados: ${d.t2m}/${d.t2a}`);
+    bindTT(row.querySelector('.t2missed'), `${d.name} — T2 fallados: ${d.t2a-d.t2m}/${d.t2a}`);
+    bindTT(row.querySelector('.t3made'), `${d.name} — T3 anotados: ${d.t3m}/${d.t3a}`);
+    bindTT(row.querySelector('.t3missed'), `${d.name} — T3 fallados: ${d.t3a-d.t3m}/${d.t3a}`);
+  });
+  fitNameColumn(finList);
+  makePrintColumns(finList);
+
+  // generadoras
+  const genEntries = generadoras(plays);
+  const maxGen = Math.max(1, ...genEntries.map(d => d.n));
+  const genList = document.getElementById('genList'); genList.innerHTML = '';
+  genEntries.forEach(d => {
+    const w = Math.max(3, Math.round((d.n/maxGen)*100));
+    const madeW = Math.round((d.made/d.n)*w);
+    const row = document.createElement('div'); row.className = 'rank-row';
+    row.innerHTML = `<div class="name">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${w}%;background:var(--surface-2);"></div><div class="fill" style="width:${madeW}%;"></div></div><div class="n">${d.made}/${d.n}</div>`;
+    genList.appendChild(row);
+    bindTT(row.querySelectorAll('.fill')[1], `${d.name} — ${d.n} jugadas creadas, ${d.made} acabaron en canasta`);
+  });
+  fitNameColumn(genList);
+  makePrintColumns(genList);
+
+  // rebote ofensivo (rendimiento: cuántos de esos rebotes acaban en canasta)
+  const rebEntries = reboteOfensivo(plays);
+  const maxReb = Math.max(1, ...rebEntries.map(d => d.n));
+  const rebList = document.getElementById('rebList'); rebList.innerHTML = '';
+  rebEntries.forEach(d => {
+    const w = Math.max(3, Math.round((d.n/maxReb)*100));
+    const madeW = Math.round((d.made/d.n)*w);
+    const row = document.createElement('div'); row.className = 'rank-row';
+    row.innerHTML = `<div class="name">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${w}%;background:var(--surface-2);"></div><div class="fill" style="width:${madeW}%;"></div></div><div class="n">${d.made}/${d.n}</div>`;
+    rebList.appendChild(row);
+    bindTT(row.querySelectorAll('.fill')[1], `${d.name} — ${d.n} rebotes ofensivos, ${d.made} acabaron en canasta (${d.pts} pts)`);
+  });
+  fitNameColumn(rebList);
+  makePrintColumns(rebList, false);
+
+  // parejas destacadas
+  const pairs = pairRelations(plays);
+  const featured = pairs.filter(p => p.n >= 2);
+  document.getElementById('pairsCount').textContent = `(${featured.length} de ${pairs.length} combinaciones distintas, con 2+ jugadas juntas)`;
+  const pairsBody = document.getElementById('pairsBody'); pairsBody.innerHTML = '';
+  featured.forEach(p => {
+    const tr = document.createElement('tr');
+    const shotTxt = p.attempts ? `${p.made}/${p.attempts}` : '<span class="dim">sin tiro</span>';
+    const exitoCls = p.exito > 0 ? 'exito-yes' : 'exito-no';
+    const sysBadges = p.systems.map(([sys,n]) => `<span class="sysbadge">${esc(sys)}${n>1?` ×${n}`:''}</span>`).join(' ');
+    tr.innerHTML = `<td class="sysname">${esc(p.gen)}</td><td class="arrow">→</td><td class="sysname">${esc(p.fin)}</td>
+      <td class="times rep">×${p.n}</td><td class="shotrec">${shotTxt}</td>
+      <td class="${exitoCls}">${p.exito}/${p.n}</td><td class="sysbadges">${sysBadges}</td>`;
+    pairsBody.appendChild(tr);
+  });
+
+  // pérdidas / faltas — por jugadora y por sistema
+  const toList = document.getElementById('toList'); toList.innerHTML = '';
+  turnoversByPlayer(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; toList.appendChild(li); });
+  const toSysList = document.getElementById('toSysList'); toSysList.innerHTML = '';
+  turnoversBySystem(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; toSysList.appendChild(li); });
+  const foulList = document.getElementById('foulList'); foulList.innerHTML = '';
+  foulsByPlayer(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; foulList.appendChild(li); });
+  const foulSysList = document.getElementById('foulSysList'); foulSysList.innerHTML = '';
+  foulsBySystem(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; foulSysList.appendChild(li); });
+
+  document.getElementById('dashFooter').innerHTML = `<b>Cómo leer este informe:</b> ${plays.length} jugadas ofensivas analizadas${rivalOffReb!==undefined?` · ${rivalOffReb} rebotes ofensivos del rival`:''}. «Generadora» (GEN) es quien crea o inicia la jugada, «Finalizadora» (FIN) quien tira, y «Rebote» (REB) quien captura el rebote ofensivo, según el descriptor de jugadoras de Nacsport. T2/T3 y el resultado (C = convertido, F = fallado) proceden de los descriptores de la categoría.`;
+
+  // tabla OER
+  const CAT_CLASS = { 'FASTBREAK':'c-fast','TRANSITION':'c-trans','OFFENSIVE REBOUND':'c-oreb','SETS':'c-sets','SIDELINES':'c-side','BASELINES':'c-base' };
+  const table = window.__fakeTable || categoryTable(plays);
+  const tbody = document.getElementById('tbody'); tbody.innerHTML = '';
+  const pctFmt = (n) => n===null ? '<span class="dim">—</span>' : (n.toFixed(1)+'%');
+  const oerClass = (oer) => oer >= 1.0 ? 'oer-good' : (oer < 0.6 ? 'oer-bad' : '');
+  table.forEach(block => {
+    const cls = CAT_CLASS[block.cat] || 'c-sets';
+    block.rows.forEach((r,i) => {
+      const tr = document.createElement('tr');
+      let catCell = '';
+      if (i===0) catCell = `<td class="catcell" rowspan="${block.rows.length+1}" style="background:var(--${cls}-bg); color:var(--${cls}-ink);">${esc(block.cat)}</td>`;
+      tr.innerHTML = `${catCell}<td class="label">${esc(r.label)}</td><td>${r.total}</td><td>${r.pts}</td>
+        <td class="${oerClass(r.oer)}">${r.oer.toFixed(2)}</td>
+        <td>${r.fgm2}</td><td>${r.fga2}</td><td>${r.fgm3}</td><td>${r.fga3}</td>
+        <td>${r.ftm}</td><td>${r.fta}</td><td>${r.pf}</td><td>${r.to}</td>
+        <td>${r.exito}/${r.total}</td><td>${pctFmt(r.pct_exito)}</td>`;
+      tbody.appendChild(tr);
+    });
+    const sub = document.createElement('tr'); sub.className = 'subtotal';
+    sub.innerHTML = `<td class="label">Subtotal ${esc(block.cat)}</td><td>${block.subtotal.total}</td><td>${block.subtotal.pts}</td>
+      <td class="${oerClass(block.subtotal.oer)}">${block.subtotal.oer.toFixed(2)}</td><td colspan="8"></td>
+      <td>${block.subtotal.exito}/${block.subtotal.total}</td><td>${pctFmt(block.subtotal.pct_exito)}</td>`;
+    tbody.appendChild(sub);
+  });
+}
+
+/* ============================================================
+   Arranque
+   ============================================================ */
+renderMatchesPage();
+</script>
