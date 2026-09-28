@@ -248,14 +248,14 @@
   .table-title{ font-size:20px; margin-block-end:6px; }
   .legend-note{ font-size:12.5px; color:var(--ink-3); max-width:78ch; margin-block-end:18px; }
   .tablewrap{ overflow-x:auto; border-radius:12px; box-shadow:var(--shadow); border:1px solid var(--border); }
-  #viewTable, #viewTableRival table{ border-collapse:collapse; width:100%; min-width:920px; background:var(--surface); }
-  #viewTable, #viewTableRival thead th{ background: var(--head-bg); color: var(--head-ink); font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; padding:10px 8px; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:2; }
-  #viewTable, #viewTableRival thead th.catcol{ text-align:left; padding-inline-start:14px; position:sticky; left:0; z-index:3; }
-  #viewTable, #viewTableRival tbody td{ padding:8px; text-align:center; font-family:"IBM Plex Mono",monospace; font-size:12.5px; border-bottom:1px solid var(--line); white-space:nowrap; color:var(--ink); }
-  #viewTable, #viewTableRival tbody td.label{ text-align:left; font-family:Karla,sans-serif; font-size:13px; font-weight:600; padding-inline-start:14px; }
-  #viewTable, #viewTableRival tbody td.catcell{ text-align:left; font-family:Oswald,sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.03em; font-weight:700; vertical-align:middle; padding-inline-start:14px; position:sticky; left:0; }
-  #viewTable, #viewTableRival tbody tr.subtotal td{ font-weight:700; background:var(--subtotal-bg); border-top:1px solid var(--line); border-bottom:2px solid var(--line); }
-  #viewTable, #viewTableRival tbody tr.subtotal td.label{ font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  #viewTable table, #viewTableRival table{ border-collapse:collapse; width:100%; min-width:920px; background:var(--surface); }
+  #viewTable thead th, #viewTableRival thead th{ background: var(--head-bg); color: var(--head-ink); font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; padding:10px 8px; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:2; }
+  #viewTable thead th.catcol, #viewTableRival thead th.catcol{ text-align:left; padding-inline-start:14px; position:sticky; left:0; z-index:3; }
+  #viewTable tbody td, #viewTableRival tbody td{ padding:8px; text-align:center; font-family:"IBM Plex Mono",monospace; font-size:12.5px; border-bottom:1px solid var(--line); white-space:nowrap; color:var(--ink); }
+  #viewTable tbody td.label, #viewTableRival tbody td.label{ text-align:left; font-family:Karla,sans-serif; font-size:13px; font-weight:600; padding-inline-start:14px; }
+  #viewTable tbody td.catcell, #viewTableRival tbody td.catcell{ text-align:left; font-family:Oswald,sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.03em; font-weight:700; vertical-align:middle; padding-inline-start:14px; position:sticky; left:0; }
+  #viewTable tbody tr.subtotal td, #viewTableRival tbody tr.subtotal td{ font-weight:700; background:var(--subtotal-bg); border-top:1px solid var(--line); border-bottom:2px solid var(--line); }
+  #viewTable tbody tr.subtotal td.label, #viewTableRival tbody tr.subtotal td.label{ font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
   .oer-good{ color: var(--good); font-weight:700; }
   .oer-bad{ color: var(--critical); }
 
@@ -343,12 +343,12 @@
 
     .table-title{ font-size:16px; margin-block-end:3px; padding-inline-start:9px; border-inline-start:3px solid var(--accent); }
     .legend-note{ font-size:9.5px; margin-block-end:6px; display:block; max-width:none; }
-    #viewTable, #viewTableRival thead th{ position:static; padding:4.5px 8px; font-size:9.5px; }
-    #viewTable, #viewTableRival tbody td{ padding:2.6px 8px; font-size:10.5px; }
-    #viewTable, #viewTableRival tbody td.label{ font-size:11px; }
-    #viewTable, #viewTableRival tbody tr.subtotal td{ padding:2.6px 8px; }
+    #viewTable thead th, #viewTableRival thead th{ position:static; padding:4.5px 8px; font-size:9.5px; }
+    #viewTable tbody td, #viewTableRival tbody td{ padding:2.6px 8px; font-size:10.5px; }
+    #viewTable tbody td.label, #viewTableRival tbody td.label{ font-size:11px; }
+    #viewTable tbody tr.subtotal td, #viewTableRival tbody tr.subtotal td{ padding:2.6px 8px; }
     .tablewrap{ box-shadow:none; overflow-x:visible; border-radius:6px; }
-    #viewTable, #viewTableRival table{ min-width:0; }
+    #viewTable table, #viewTableRival table{ min-width:0; }
   }
 </style>
 
@@ -490,7 +490,7 @@
         <button class="tab-btn rival-tab" data-target="viewDashboardRival" id="tabRivalDash" type="button">Rival: Resumen</button>
         <button class="tab-btn rival-tab" data-target="viewTableRival" id="tabRivalTable" type="button">Rival: Tabla</button>
       </div><br>
-      <button class="pdf-btn" onclick="window.print()" type="button">
+      <button class="pdf-btn" onclick="exportPdf()" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
         Exportar a PDF
       </button>
@@ -612,6 +612,13 @@
   </div>
 
   <div id="viewDashboardRival" class="view">
+    <div class="report-head" style="border-bottom-color:var(--accent);">
+      <div>
+        <div class="report-eyebrow">Valencia Basket · Videoanálisis</div>
+        <h2 id="repTitleRival">—</h2>
+        <p class="report-sub" id="repSubtitleRival"></p>
+      </div>
+    </div>
     <div class="kpis" id="kpiStripRival"></div>
 
     <section>
@@ -1296,19 +1303,19 @@ document.getElementById('btnVerRival').addEventListener('click', () => {
   const plays = matches.filter(m => m.rival === rival).flatMap(m => m.plays);
   const rivalOffReb = matches.filter(m => m.rival === rival).reduce((a,m) => a + m.rivalOffReb, 0);
   const n = matches.filter(m => m.rival === rival).length;
-  buildReport(plays, rivalOffReb, `Ataque vs. ${rival}`, `Acumulado de ${n} partido${n===1?'':'s'} frente a este rival.`, `${n} partido${n===1?'':'s'}`);
+  buildReport(plays, rivalOffReb, `Ataque vs. ${rival}`, `Acumulado de ${n} partido${n===1?'':'s'} frente a este rival.`, `${n} partido${n===1?'':'s'}`, rival);
 });
 
 document.getElementById('btnVerTotal').addEventListener('click', () => {
   const plays = matches.flatMap(m => m.plays);
   const rivalOffReb = matches.reduce((a,m) => a + m.rivalOffReb, 0);
-  buildReport(plays, rivalOffReb, 'Ataque — Temporada completa', `Acumulado de los ${matches.length} partidos guardados.`, `${matches.length} partidos`);
+  buildReport(plays, rivalOffReb, 'Ataque — Temporada completa', `Acumulado de los ${matches.length} partidos guardados.`, `${matches.length} partidos`, 'Rivales de la temporada');
 });
 
 function viewMatch(id){
   const m = matches.find(x => x.id === id);
   if (!m) return;
-  buildReport(m.plays, m.rivalOffReb, `Ataque vs. ${m.rival}`, `${fmtDate(m.date)} · ${m.competition || 'Partido'}`, fmtDate(m.date));
+  buildReport(m.plays, m.rivalOffReb, `Ataque vs. ${m.rival}`, `${fmtDate(m.date)} · ${m.competition || 'Partido'}`, fmtDate(m.date), m.rival);
 }
 
 /* ============================================================
@@ -1745,7 +1752,7 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
   });
 }
 
-function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
+function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLabel){
   // La página tiene que estar visible ANTES de construir las listas: varias
   // filas miden su ancho real en pantalla (fitFlexCol/fitNameColumn) para que
   // los nombres no se corten y las barras empiecen/acaben todas en el mismo
@@ -1774,6 +1781,13 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
 
   document.getElementById('repTitle').textContent = title;
   document.getElementById('repSubtitle').textContent = subtitle;
+  // Título propio para el bloque "Ataque rival": al imprimir, esta vista
+  // empieza en una página nueva (break-before) y hasta ahora arrancaba
+  // directa en los KPIs sin ningún encabezado que diga de qué equipo se
+  // habla a partir de aquí — se repite el mismo estilo de título que en el
+  // bloque propio, pero con el análisis ofensivo del rival.
+  document.getElementById('repTitleRival').textContent = `Análisis ofensivo — ${rivalLabel || 'Rival'}`;
+  document.getElementById('repSubtitleRival').textContent = subtitle;
   document.getElementById('repMeta').textContent = metaLabel || '';
 
   // mostrar/ocultar las pestañas y vistas del rival según si este partido (o
@@ -1807,6 +1821,59 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
   document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===0));
   views.forEach((v,i) => v.classList.toggle('active', i===0));
 }
+
+/* ============================================================
+   Ajuste automático del PDF a un máximo de 6 páginas
+   ============================================================
+   Cada informe imprime hasta 4 bloques (resumen propio, tabla propia,
+   resumen rival, tabla rival), cada uno forzado a empezar en página nueva
+   (ver "break-before: page" en el CSS de impresión). Con partidos/temporadas
+   con muchos sistemas o jugadoras, cualquiera de esos bloques puede desbordar
+   más páginas de las deseadas. Para que el PDF NUNCA pase de 6 páginas (o de
+   3 cuando no hay rival), se limita cada resumen a un máximo de 2 páginas y
+   cada tabla a 1, reduciendo el zoom del bloque justo antes de imprimir si
+   hace falta — con "zoom" (no "transform"), que si reduce el alto real que
+   ocupa el contenido a efectos de paginación, al contrario que transform. */
+const PRINT_PAGE_HEIGHT_PX = 718; // alto útil de A4 horizontal con márgenes de 10mm, a 96px/pulgada
+function fitPrintBlock(id, maxPages){
+  const el = document.getElementById(id);
+  if (!el || el.classList.contains('no-rival')) return;
+  el.style.zoom = '';
+  // getBoundingClientRect().height, no scrollHeight: "zoom" reduce el hueco
+  // que el bloque ocupa visto desde fuera (lo que decide cuántas páginas
+  // ocupa al imprimir), pero scrollHeight sigue devolviendo el alto interno
+  // sin aplicar zoom — con scrollHeight el cálculo del factor de reducción
+  // sale mal.
+  // El factor 0.8 (en vez de dejar el presupuesto justo) da margen para el
+  // hueco muerto que dejan las secciones protegidas contra corte a mitad
+  // (break-inside: avoid, en parejas / rebote-pérdidas-faltas): cuando una de
+  // esas no cabe entera en lo que queda de página salta completa a la
+  // siguiente, y ese hueco no lo refleja la altura total medida aquí.
+  const budget = PRINT_PAGE_HEIGHT_PX * maxPages * 0.8;
+  const h = el.getBoundingClientRect().height;
+  if (h > budget) {
+    el.style.zoom = Math.max(0.35, budget / h);
+  }
+}
+// El ajuste se dispara desde el propio botón "Exportar a PDF" (no del evento
+// "beforeprint": con la exportación automatizada a PDF ese evento no llega a
+// dispararse, y depender de él es frágil). El zoom se deshace al volver de
+// imprimir (evento "afterprint", con un timeout de respaldo por si el
+// navegador no lo dispara).
+function exportPdf(){
+  fitPrintBlock('viewDashboard', 2);
+  fitPrintBlock('viewTable', 1);
+  fitPrintBlock('viewDashboardRival', 2);
+  fitPrintBlock('viewTableRival', 1);
+  window.print();
+}
+function resetPrintZoom(){
+  ['viewDashboard', 'viewTable', 'viewDashboardRival', 'viewTableRival'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.zoom = '';
+  });
+}
+window.addEventListener('afterprint', resetPrintZoom);
 
 /* ============================================================
    Arranque
