@@ -156,6 +156,9 @@
     background:var(--surface-2); color:var(--ink-2); border:none; padding:7px 13px; border-radius:20px; cursor:pointer;
   }
   .tab-btn.active{ background:var(--ink); color:#fff; }
+  .tab-btn.hidden{ display:none; }
+  .tab-btn.rival-tab{ background:var(--accent-wash); color:var(--accent); }
+  .tab-btn.rival-tab.active{ background:var(--accent); color:#fff; }
   .pdf-btn{
     display:inline-flex; align-items:center; gap:7px; background:var(--ink); color:#fff; border:none;
     font-family:Karla,sans-serif; font-size:12.5px; font-weight:700; letter-spacing:.02em;
@@ -245,14 +248,14 @@
   .table-title{ font-size:20px; margin-block-end:6px; }
   .legend-note{ font-size:12.5px; color:var(--ink-3); max-width:78ch; margin-block-end:18px; }
   .tablewrap{ overflow-x:auto; border-radius:12px; box-shadow:var(--shadow); border:1px solid var(--border); }
-  #viewTable table{ border-collapse:collapse; width:100%; min-width:920px; background:var(--surface); }
-  #viewTable thead th{ background: var(--head-bg); color: var(--head-ink); font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; padding:10px 8px; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:2; }
-  #viewTable thead th.catcol{ text-align:left; padding-inline-start:14px; position:sticky; left:0; z-index:3; }
-  #viewTable tbody td{ padding:8px; text-align:center; font-family:"IBM Plex Mono",monospace; font-size:12.5px; border-bottom:1px solid var(--line); white-space:nowrap; color:var(--ink); }
-  #viewTable tbody td.label{ text-align:left; font-family:Karla,sans-serif; font-size:13px; font-weight:600; padding-inline-start:14px; }
-  #viewTable tbody td.catcell{ text-align:left; font-family:Oswald,sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.03em; font-weight:700; vertical-align:middle; padding-inline-start:14px; position:sticky; left:0; }
-  #viewTable tbody tr.subtotal td{ font-weight:700; background:var(--subtotal-bg); border-top:1px solid var(--line); border-bottom:2px solid var(--line); }
-  #viewTable tbody tr.subtotal td.label{ font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  #viewTable, #viewTableRival table{ border-collapse:collapse; width:100%; min-width:920px; background:var(--surface); }
+  #viewTable, #viewTableRival thead th{ background: var(--head-bg); color: var(--head-ink); font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; padding:10px 8px; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:2; }
+  #viewTable, #viewTableRival thead th.catcol{ text-align:left; padding-inline-start:14px; position:sticky; left:0; z-index:3; }
+  #viewTable, #viewTableRival tbody td{ padding:8px; text-align:center; font-family:"IBM Plex Mono",monospace; font-size:12.5px; border-bottom:1px solid var(--line); white-space:nowrap; color:var(--ink); }
+  #viewTable, #viewTableRival tbody td.label{ text-align:left; font-family:Karla,sans-serif; font-size:13px; font-weight:600; padding-inline-start:14px; }
+  #viewTable, #viewTableRival tbody td.catcell{ text-align:left; font-family:Oswald,sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.03em; font-weight:700; vertical-align:middle; padding-inline-start:14px; position:sticky; left:0; }
+  #viewTable, #viewTableRival tbody tr.subtotal td{ font-weight:700; background:var(--subtotal-bg); border-top:1px solid var(--line); border-bottom:2px solid var(--line); }
+  #viewTable, #viewTableRival tbody tr.subtotal td.label{ font-family:"IBM Plex Mono",monospace; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
   .oer-good{ color: var(--good); font-weight:700; }
   .oer-bad{ color: var(--critical); }
 
@@ -264,7 +267,8 @@
     .page{ display:none !important; }
     .page.active{ display:block !important; }
     .view{ display:block !important; }
-    #viewTable{ break-before: page; }
+    .view.no-rival{ display:none !important; }
+    #viewTable, #viewDashboardRival, #viewTableRival{ break-before: page; }
 
     .report-head{ padding-block-end:8px; margin-block-end:12px; border-bottom-width:2px; }
     .report-eyebrow{ font-size:9.5px; margin-block-end:3px; }
@@ -339,12 +343,12 @@
 
     .table-title{ font-size:16px; margin-block-end:3px; padding-inline-start:9px; border-inline-start:3px solid var(--accent); }
     .legend-note{ font-size:9.5px; margin-block-end:6px; display:block; max-width:none; }
-    #viewTable thead th{ position:static; padding:4.5px 8px; font-size:9.5px; }
-    #viewTable tbody td{ padding:2.6px 8px; font-size:10.5px; }
-    #viewTable tbody td.label{ font-size:11px; }
-    #viewTable tbody tr.subtotal td{ padding:2.6px 8px; }
+    #viewTable, #viewTableRival thead th{ position:static; padding:4.5px 8px; font-size:9.5px; }
+    #viewTable, #viewTableRival tbody td{ padding:2.6px 8px; font-size:10.5px; }
+    #viewTable, #viewTableRival tbody td.label{ font-size:11px; }
+    #viewTable, #viewTableRival tbody tr.subtotal td{ padding:2.6px 8px; }
     .tablewrap{ box-shadow:none; overflow-x:visible; border-radius:6px; }
-    #viewTable table{ min-width:0; }
+    #viewTable, #viewTableRival table{ min-width:0; }
   }
 </style>
 
@@ -412,9 +416,7 @@
         <div class="field"><label for="inpDate">Fecha del partido</label><input type="date" id="inpDate"></div>
         <div class="field"><label for="inpRival">Rival</label><input type="text" id="inpRival" list="rivalList" placeholder="p. ej. Lima Horta"><datalist id="rivalList"></datalist></div>
         <div class="field"><label for="inpComp">Competición</label>
-          <select id="inpComp">
-            <option>Liga</option><option>Copa</option><option>Euroliga / Europa</option><option>Amistoso</option><option>Otra</option>
-          </select>
+          <input type="text" id="inpComp" list="compList" placeholder="p. ej. Liga, Copa, Supercopa…"><datalist id="compList"></datalist>
         </div>
       </div>
       <label class="file-drop" id="dropZone">
@@ -448,6 +450,15 @@
   </section>
 
   <section>
+    <h2>Plantilla propia (para separar rendimiento propio / rival)</h2>
+    <p class="section-note">Códigos Nacsport de las jugadoras <b>propias</b> (tal cual aparecen en GEN_/FIN_/REB_, p. ej. «ARAUJO», «KB»), separados por comas. Cualquier jugada etiquetada con un código que no esté en esta lista se cuenta como del <b>rival</b>. Una jugada sin ninguna jugadora etiquetada se cuenta como propia por defecto (compatibilidad con partidos ya guardados sin seguimiento del rival).</p>
+    <div class="card">
+      <textarea id="ownRosterInput" rows="3" style="width:100%; font-family:'IBM Plex Mono',monospace; font-size:12.5px; padding:9px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg); color:var(--ink);"></textarea>
+      <div style="margin-block-start:12px;"><button class="btn secondary" id="btnGuardarRoster" type="button">Guardar plantilla propia</button></div>
+    </div>
+  </section>
+
+  <section>
     <h2>Nombres de jugadoras</h2>
     <p class="section-note">Nacsport identifica a cada jugadora por un código corto (p. ej. «ARAUJO», «KB»). Ponle aquí el nombre que quieres que se muestre en los informes; se aplica a todos los partidos, incluidos los ya guardados.</p>
     <div class="card" style="padding:0; overflow-x:auto;">
@@ -476,6 +487,8 @@
       <div class="tabs">
         <button class="tab-btn active" data-target="viewDashboard" type="button">Resumen visual</button>
         <button class="tab-btn" data-target="viewTable" type="button">Tabla por sistema</button>
+        <button class="tab-btn rival-tab" data-target="viewDashboardRival" id="tabRivalDash" type="button">Rival: Resumen</button>
+        <button class="tab-btn rival-tab" data-target="viewTableRival" id="tabRivalTable" type="button">Rival: Tabla</button>
       </div><br>
       <button class="pdf-btn" onclick="window.print()" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
@@ -597,6 +610,120 @@
       </ul>
     </div>
   </div>
+
+  <div id="viewDashboardRival" class="view">
+    <div class="kpis" id="kpiStripRival"></div>
+
+    <section>
+      <h2>Sistemas ofensivos más usados <span class="count" id="sysCountRival"></span></h2>
+      <p class="section-note">Frecuencia de cada set o acción ofensiva registrada (excluye posesiones marcadas solo como «Defensa»). La barra mide número de repeticiones.</p>
+      <div class="card"><div class="rowlist" id="sysListRival"></div></div>
+    </section>
+
+    <section>
+      <h2>Acierto de tiro por sistema <span class="count" id="shotSysCountRival"></span></h2>
+      <p class="section-note">Todos los sistemas con algún tiro registrado. Verde = anotado, gris = fallado.</p>
+      <div class="legend-inline"><span><i style="background:var(--good)"></i>Anotado</span><span><i style="background:var(--miss)"></i>Fallado</span></div>
+      <div class="card"><div class="rowlist" id="shotSysListRival"></div></div>
+    </section>
+
+    <div class="grid-2">
+      <section>
+        <h2>Finalizadoras <span class="count" id="finCountRival"></span></h2>
+        <p class="section-note">Tiros por jugadora que termina la jugada, separando T2 y T3, con el % de acierto sobre sus propios intentos.</p>
+        <div class="legend-inline">
+          <span><i style="background:var(--accent)"></i>T2 anotado</span><span><i style="background:var(--three)"></i>T3 anotado</span>
+          <span><i style="background:var(--accent-wash)"></i>T2 fallado</span><span><i style="background:var(--three-wash)"></i>T3 fallado</span>
+        </div>
+        <div class="card"><div class="rowlist" id="finListRival"></div></div>
+      </section>
+      <section>
+        <h2>Generadoras</h2>
+        <p class="section-note">Nº de jugadas en las que la jugadora inicia o crea la acción («GEN»); en color de acento, cuántas acabaron en canasta.</p>
+        <div class="card"><div class="rowlist" id="genListRival"></div></div>
+      </section>
+    </div>
+
+    <section>
+      <h2>Parejas destacadas <span class="count" id="pairsCountRival"></span></h2>
+      <p class="section-note">Combinaciones generadora → finalizadora que más se repiten (mínimo 2 veces juntas), y en qué sistemas se han dado. Se excluyen jugadas donde generadora y finalizadora coinciden.</p>
+      <div class="card" style="overflow-x:auto;">
+        <table class="pairs-table" id="pairsTableRival">
+          <thead><tr><th>Generadora</th><th></th><th>Finalizadora</th><th>Veces</th><th>Tiro</th><th>Éxito</th><th>Sistemas</th></tr></thead>
+          <tbody id="pairsBodyRival"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Rebote ofensivo, pérdidas y faltas provocadas</h2>
+      <p class="section-note">Rebotes ofensivos capturados y en cuántos se anotó después; quién tiene el balón cuando se produce la pérdida y en qué sistemas; y quién finaliza la jugada cuando el rival comete falta y en qué sistemas.</p>
+      <div class="grid-3">
+        <div class="card">
+          <div class="sublabel" style="color:var(--accent);">Rebote ofensivo</div>
+          <div class="rowlist" id="rebListRival"></div>
+        </div>
+        <div class="card">
+          <div class="sublabel" style="color:var(--critical);">Pérdidas</div>
+          <div class="small-cols">
+            <div class="small-col">
+              <div class="small-col-label">Por jugadora</div>
+              <div class="small-list" id="toListRival"></div>
+            </div>
+            <div class="small-col">
+              <div class="small-col-label">Por sistema</div>
+              <div class="small-list" id="toSysListRival"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sublabel" style="color:var(--good);">Faltas provocadas</div>
+          <div class="small-cols">
+            <div class="small-col">
+              <div class="small-col-label">Por jugadora</div>
+              <div class="small-list" id="foulListRival"></div>
+            </div>
+            <div class="small-col">
+              <div class="small-col-label">Por sistema</div>
+              <div class="small-list" id="foulSysListRival"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="page-footer" id="dashFooterRival"></div>
+  </div>
+
+  <div id="viewTableRival" class="view">
+    <h2 class="table-title">Eficiencia ofensiva por sistema</h2>
+    <p class="legend-note">OER = puntos / posesión, agrupado por fase de ataque. La agrupación en fases es configurable en «Configuración» — revísala con el cuerpo técnico.</p>
+    <div class="tablewrap">
+      <table id="mainTableRival">
+        <thead>
+          <tr>
+            <th class="catcol">Fase</th><th>Sistema</th>
+            <th>Total</th><th>Pts</th><th>OER</th>
+            <th>2PM</th><th>2PA</th><th>3PM</th><th>3PA</th>
+            <th>TLM</th><th>TLA</th><th>PF</th><th>TO</th>
+            <th title="Canasta o falta recibida">Éxito</th><th>%Éxito</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyRival"></tbody>
+      </table>
+    </div>
+    <div class="page-footer">
+      <b>Cómo se ha calculado:</b>
+      <ul>
+        <li><b>OER</b> = puntos anotados en ese sistema / número de veces que se jugó (posesiones), redondeado a 2 decimales.</li>
+        <li><b>2PM/2PA, 3PM/3PA</b>: tiros de campo anotados/intentados, leídos de las etiquetas T2/T3 + C (convertido) / F (fallado); las jugadas «2+1» cuentan como tiro de 2 anotado.</li>
+        <li><b>TLM/TLA</b> (tiros libres): a partir de 1TLC/2TLC (convertidos), 1TLF/2TLF (fallados) y el tiro extra de las jugadas «2+1». Nacsport no separa cada tiro libre individualmente, así que es una lectura por viaje a la línea, no tiro a tiro.</li>
+        <li><b>PF</b>: veces que la jugada terminó con falta (FALTA o FALTA TIRO) sobre la defensa propia. <b>TO</b>: pérdidas de balón en esa jugada.</li>
+        <li><b>Éxito / %Éxito</b>: la jugada cuenta como éxito si termina en canasta o si se comete falta — se anote o no el tiro libre después.</li>
+        <li>Se excluyen las posesiones marcadas solo como <b>DEFENSA</b> y las etiquetas BDL / BDC / DHO LADO DE 2-3 / STEP UP (describen el bloqueo dentro de otro sistema ya contabilizado). Las jugadas se identifican como del rival por el código de jugadora rival etiquetado en Nacsport.</li>
+      </ul>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -605,9 +732,35 @@
    Puerto a JS puro de la lógica validada sobre Valencia-Lima.xml.
    ============================================================ */
 
-const EXCLUDE_CODES = new Set(['DEFENSA', 'POST REB OFF RIVAL', 'BDL', 'BDC', 'DHO LADO DE 2', 'DHO LADO DE 3']);
+// BDL/BDC/DHO LADO DE 2-3/STEP UP son sub-etiquetas descriptivas de bloqueo
+// directo (quién puso el bloqueo, tipo de defensa, etc.) que Nacsport graba
+// como una instancia paralela a la jugada real — se identifican porque no
+// llevan ninguna etiqueta GEN_/FIN_/REB_, solo nombres de jugadora en texto
+// plano. No son jugadas en sí, así que se excluyen para no duplicar/ensuciar
+// el recuento de sistemas.
+const EXCLUDE_CODES = new Set(['DEFENSA', 'BDL', 'BDC', 'DHO LADO DE 2', 'DHO LADO DE 3', 'STEP UP']);
 const RIVAL_OREB_CODE = 'POST REB OFF RIVAL';
 const DEFENSE_CODE = 'DEFENSA';
+
+/* ---------- Plantilla propia (separación de rendimiento propio / rival) ----------
+   La plantilla nueva de Nacsport etiqueta a las jugadoras rivales con
+   group="RIVALES" (frente a group="JUGADORAS" para las propias) en las
+   mismas etiquetas GEN_/FIN_/REB_ — esa es la señal fiable de equipo, y se
+   guarda directamente en cada jugada (play.team) al construirla en
+   buildPlays(). El nombre del sistema NO sirve para distinguir de quién es
+   la jugada: muchos sistemas se llaman igual para ambos equipos.
+   classifyTeam() se apoya primero en play.team; solo recurre a la plantilla
+   propia configurada (comparando el código de jugadora) para partidos
+   guardados ANTES de este seguimiento del rival, que no tienen ese campo.
+   Sin ninguna jugadora etiquetada, se asume propia (compatibilidad). */
+const DEFAULT_OWN_ROSTER = ['PETERSON','KISS','BALOGUN','BUENAVIDA','KENDRA','ARAUJO','LETI','KB','PUEYO','RAQUEL','SUAREZ','FLOREZ','JENKINS','ISA','AMELIA','REYNAL','BLEDA','SANDRA'];
+
+function classifyTeam(play, ownRosterSet) {
+  if (play.team === 'own' || play.team === 'rival') return play.team;
+  const codes = [play.gen, play.fin, play.reb].filter(Boolean);
+  if (!codes.length) return 'own';
+  return codes.some(c => ownRosterSet.has(c)) ? 'own' : 'rival';
+}
 
 const DEFAULT_CATEGORY_MAP = {
   // FASTBREAK
@@ -616,7 +769,7 @@ const DEFAULT_CATEGORY_MAP = {
   'SPURS': 'TRANSITION', 'BALL IN LLEGANDO': 'TRANSITION', 'DRAG EMPTY': 'TRANSITION',
   'DRAG FULL': 'TRANSITION', 'RANDOM PNR': 'TRANSITION',
   // OFFENSIVE REBOUND
-  'POST REBOTE OFENSIVO': 'OFFENSIVE REBOUND',
+  'POST REBOTE OFENSIVO': 'OFFENSIVE REBOUND', 'POST REB OFF RIVAL': 'OFFENSIVE REBOUND',
   // SETS
   'SIN SISTEMA': 'SETS', 'TOP': 'SETS', 'HORNS QUICK 44': 'SETS', 'HORNS QUICK 42': 'SETS',
   'HORNS FLASH 45': 'SETS', 'HORNS DOWN 45': 'SETS', 'ATO SIST': 'SETS', "ATO'S / STARTERS": 'SETS',
@@ -634,7 +787,7 @@ const CATEGORY_RULES = [
   [/^SLOB/, 'SIDELINES'],
   [/QUICK ESCAPE$/, 'SIDELINES'],
   [/^BLOB/, 'BASELINES'],
-  [/REBOTE OFEN/, 'OFFENSIVE REBOUND']
+  [/REBOTE OFEN|REB OFF/, 'OFFENSIVE REBOUND']
 ];
 
 function guessCategory(systemCode) {
@@ -676,7 +829,18 @@ function resolvePlayerName(suffix, aliasMap) {
    Nota: gen/fin/reb se guardan como CÓDIGO CRUDO (p.ej. "LETI"), no como
    nombre resuelto. El nombre a mostrar se resuelve más tarde con
    resolvePlayNames() usando el alias vigente en ESE momento, para que
-   renombrar a una jugadora se aplique también a partidos ya guardados. */
+   renombrar a una jugadora se aplique también a partidos ya guardados.
+
+   Cada jugada lleva además play.team ('own' | 'rival'), leído directamente
+   del group de la etiqueta de jugadora (JUGADORAS vs RIVALES) — la señal más
+   fiable, ya que el nombre del sistema puede repetirse igual en ambos
+   equipos. Casi siempre una instancia entera es de un único equipo, pero
+   Nacsport a veces mete en UNA sola instancia el desenlace de una jugada del
+   rival seguido de la jugada propia que viene justo después (p.ej. tiro
+   fallado del rival + contraataque anotado): en ese caso se detecta el
+   cambio de grupo entre etiquetas de jugadora y se generan dos jugadas
+   separadas, cada una quedándose solo con las etiquetas de resultado
+   (T2/T3/C/F/FALTA/PÉRDIDA/TL...) que le siguen dentro de la instancia. */
 function buildPlays(instances) {
   const plays = [];
   let rivalOffReb = 0;
@@ -684,57 +848,70 @@ function buildPlays(instances) {
 
   for (const inst of instances) {
     const code = inst.code;
-    if (code === RIVAL_OREB_CODE) { rivalOffReb++; continue; }
     if (code === DEFENSE_CODE) { defensivePossessions++; continue; }
-    if (EXCLUDE_CODES.has(code)) continue; // BDL/BDC/DHO... son sub-etiquetas de otra jugada ya contada
+    if (EXCLUDE_CODES.has(code)) continue; // BDL/BDC/DHO.../STEP UP son sub-etiquetas de otra jugada ya contada
+    const isRivalOreb = code === RIVAL_OREB_CODE;
+    if (isRivalOreb) rivalOffReb++; // se sigue contando el contador histórico, pero AHORA también se procesa como jugada normal
 
-    const texts = inst.labels.map(l => l.text);
-    const hasTag = t => texts.includes(t);
-
-    let gen = null, fin = null, reb = null;
+    // Divide las etiquetas en segmentos por equipo (ver comentario de arriba).
+    const segments = [];
+    let current = null;
     for (const lab of inst.labels) {
-      if (lab.group !== 'JUGADORAS') continue;
       const m = /^(GEN|FIN|REB)_(.+)$/.exec(lab.text);
-      if (!m) continue;
-      const code2 = m[2].toUpperCase();
-      if (m[1] === 'GEN') gen = code2;
-      else if (m[1] === 'FIN') fin = code2;
-      else if (m[1] === 'REB') reb = code2;
+      if (m && (lab.group === 'JUGADORAS' || lab.group === 'RIVALES')) {
+        const team = lab.group === 'RIVALES' ? 'rival' : 'own';
+        if (!current || current.team !== team) {
+          current = { team, gen: null, fin: null, reb: null, texts: [] };
+          segments.push(current);
+        }
+        const code2 = m[2].toUpperCase();
+        if (m[1] === 'GEN') current.gen = code2;
+        else if (m[1] === 'FIN') current.fin = code2;
+        else if (m[1] === 'REB') current.reb = code2;
+      } else {
+        if (!current) { current = { team: 'own', gen: null, fin: null, reb: null, texts: [] }; segments.push(current); }
+        current.texts.push(lab.text);
+      }
     }
+    if (!segments.length) continue; // instancia sin ninguna etiqueta útil (no debería pasar tras los excludes de arriba)
 
-    const isAndOne = hasTag('2+1');
-    // "2+1" describe por sí misma el resultado (canasta anotada + 1 tiro libre
-    // adicional), así que manda sobre cualquier C/F que la acompañe: en el
-    // export algunas jugadas de 2+1 llevan una 'F' residual que no indica un
-    // tiro fallado en este caso.
-    let shotType = hasTag('T3') ? 3 : (hasTag('T2') ? 2 : null);
-    let made = shotType ? (hasTag('C') ? true : (hasTag('F') ? false : null)) : null;
-    if (isAndOne) { shotType = shotType || 2; made = true; }
-    const foul = hasTag('FALTA') || hasTag('FALTA TIRO');
-    const turnover = hasTag('PÉRDIDA');
+    for (const seg of segments) {
+      const hasTag = t => seg.texts.includes(t);
 
-    // Tiros libres: lectura por viaje a la línea (Nacsport no separa tiro a tiro)
-    let ftm = 0, fta = 0;
-    if (hasTag('1TLC')) { ftm += 1; fta += 1; }
-    if (hasTag('1TLF')) { fta += 1; }
-    if (hasTag('2TLC')) { ftm += 2; fta += 2; }
-    if (hasTag('2TLF')) { fta += 2; }
-    if (isAndOne) { ftm += 1; fta += 1; }
+      const isAndOne = hasTag('2+1');
+      // "2+1" describe por sí misma el resultado (canasta anotada + 1 tiro libre
+      // adicional), así que manda sobre cualquier C/F que la acompañe: en el
+      // export algunas jugadas de 2+1 llevan una 'F' residual que no indica un
+      // tiro fallado en este caso.
+      let shotType = hasTag('T3') ? 3 : (hasTag('T2') ? 2 : null);
+      let made = shotType ? (hasTag('C') ? true : (hasTag('F') ? false : null)) : null;
+      if (isAndOne) { shotType = shotType || 2; made = true; }
+      const foul = hasTag('FALTA') || hasTag('FALTA TIRO');
+      const turnover = hasTag('PÉRDIDA');
 
-    const fgm = (shotType && made) ? 1 : 0;
-    const fga = shotType ? 1 : 0;
-    const pts = (shotType && made ? shotType : 0) + ftm;
-    const exito = (shotType && made) || foul; // canasta anotada O falta recibida
+      // Tiros libres: lectura por viaje a la línea (Nacsport no separa tiro a tiro)
+      let ftm = 0, fta = 0;
+      if (hasTag('1TLC')) { ftm += 1; fta += 1; }
+      if (hasTag('1TLF')) { fta += 1; }
+      if (hasTag('2TLC')) { ftm += 2; fta += 2; }
+      if (hasTag('2TLF')) { fta += 2; }
+      if (isAndOne) { ftm += 1; fta += 1; }
 
-    plays.push({
-      id: inst.id, system: code,
-      category: null, // se resuelve luego con el mapa de categorías (puede variar entre partidos)
-      gen, fin, reb,
-      shotType, made, fgm, fga,
-      ftm, fta, isAndOne,
-      foul, turnover,
-      pts, exito
-    });
+      const fgm = (shotType && made) ? 1 : 0;
+      const fga = shotType ? 1 : 0;
+      const pts = (shotType && made ? shotType : 0) + ftm;
+      const exito = (shotType && made) || foul; // canasta anotada O falta recibida
+
+      plays.push({
+        id: inst.id, system: code, team: seg.team,
+        category: null, // se resuelve luego con el mapa de categorías (puede variar entre partidos)
+        gen: seg.gen, fin: seg.fin, reb: seg.reb,
+        shotType, made, fgm, fga,
+        ftm, fta, isAndOne,
+        foul, turnover,
+        pts, exito
+      });
+    }
   }
 
   return { plays, rivalOffReb, defensivePossessions };
@@ -781,7 +958,7 @@ function computeKPIs(plays, rivalOffReb) {
   const t3 = shots.filter(p => p.shotType === 3);
   const t2m = t2.filter(p => p.made).length;
   const t3m = t3.filter(p => p.made).length;
-  const ownOffReb = plays.filter(p => p.system && /REBOTE OFEN/.test(p.system)).length;
+  const ownOffReb = plays.filter(p => p.system && /REBOTE OFEN|REB OFF/.test(p.system)).length;
   const turnovers = plays.filter(p => p.turnover).length;
   const foulsDrawn = plays.filter(p => p.foul).length;
   return {
@@ -973,7 +1150,7 @@ if (typeof module !== 'undefined') {
     resolvePlayNames, collectUnknownPlayers, resolvePlayerName,
     computeKPIs, systemUsage, shotAccuracyBySystem, finalizadoras, generadoras, reboteOfensivo,
     pairRelations, turnoversByPlayer, foulsByPlayer, turnoversBySystem, foulsBySystem, categoryTable, processMatchXML,
-    DEFAULT_CATEGORY_MAP, CATEGORY_ORDER
+    DEFAULT_CATEGORY_MAP, CATEGORY_ORDER, DEFAULT_OWN_ROSTER, classifyTeam
   };
 }
 
@@ -985,6 +1162,7 @@ if (typeof module !== 'undefined') {
 const STORE_KEY = 'vbScoutingMatches';
 const CATMAP_KEY = 'vbScoutingCategoryMap';
 const ALIAS_KEY = 'vbScoutingPlayerAliases';
+const OWNROSTER_KEY = 'vbScoutingOwnRoster';
 
 function loadMatches(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch(e){ return []; } }
 function saveMatches(list){ localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
@@ -992,10 +1170,13 @@ function loadCategoryMap(){ try { return JSON.parse(localStorage.getItem(CATMAP_
 function saveCategoryMap(map){ localStorage.setItem(CATMAP_KEY, JSON.stringify(map)); }
 function loadAliasMap(){ try { return JSON.parse(localStorage.getItem(ALIAS_KEY)) || {}; } catch(e){ return {}; } }
 function saveAliasMap(map){ localStorage.setItem(ALIAS_KEY, JSON.stringify(map)); }
+function loadOwnRoster(){ try { return JSON.parse(localStorage.getItem(OWNROSTER_KEY)) || [...DEFAULT_OWN_ROSTER]; } catch(e){ return [...DEFAULT_OWN_ROSTER]; } }
+function saveOwnRoster(list){ localStorage.setItem(OWNROSTER_KEY, JSON.stringify(list)); }
 
 let matches = loadMatches();
 let categoryMap = loadCategoryMap();
 let aliasMap = loadAliasMap();
+let ownRoster = loadOwnRoster();
 
 /* ============================================================
    Navegación entre páginas
@@ -1032,17 +1213,24 @@ function renderMatchesPage(){
   document.getElementById('matchesCount').textContent = `(${matches.length})`;
   document.getElementById('emptyNote').style.display = matches.length ? 'none' : 'block';
 
+  // "Jugadas"/"Puntos"/"OER" en esta lista son SOLO del rendimiento propio
+  // (para eso sirve la tabla: seguimiento de nuestro equipo partido a
+  // partido) — hay que descartar las jugadas del rival antes de sumar, si
+  // no, un partido con seguimiento del rival cuenta el doble de jugadas y
+  // mezcla los puntos de ambos equipos en un único número sin sentido.
+  const ownSetList = new Set(ownRoster.map(s => s.toUpperCase()));
   const sorted = [...matches].sort((a,b) => (b.date||'').localeCompare(a.date||''));
   for (const m of sorted) {
-    const named = resolvePlayNames(m.plays, aliasMap);
+    const ownRaw = m.plays.filter(p => classifyTeam(p, ownSetList) === 'own');
+    const named = resolvePlayNames(ownRaw, aliasMap);
     const categorized = applyCategoryMap(named, categoryMap);
     const pts = categorized.reduce((a,p) => a + p.pts, 0);
-    const oer = m.plays.length ? (pts / m.plays.length) : 0;
+    const oer = ownRaw.length ? (pts / ownRaw.length) : 0;
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="mono">${fmtDate(m.date)}</td>
       <td class="rival">${esc(m.rival)}</td>
       <td><span class="pill">${esc(m.competition||'—')}</span></td>
-      <td class="mono">${m.plays.length}</td>
+      <td class="mono">${ownRaw.length}</td>
       <td class="mono">${pts}</td>
       <td class="mono">${oer.toFixed(2)}</td>
       <td class="row-actions">
@@ -1052,7 +1240,26 @@ function renderMatchesPage(){
     tbody.appendChild(tr);
   }
   tbody.querySelectorAll('button.btn-view').forEach(b => b.addEventListener('click', () => viewMatch(b.dataset.id)));
-  tbody.querySelectorAll('button.del').forEach(b => b.addEventListener('click', () => deleteMatch(b.dataset.id)));
+  // Confirmación en dos clics en el propio botón: el diálogo nativo confirm()
+  // lo bloquea el sandbox del artifact (se resuelve como "cancelar" sin
+  // llegar a mostrarse), así que el primer clic solo pide confirmación
+  // visualmente y el segundo (en los 3s siguientes) borra de verdad.
+  tbody.querySelectorAll('button.del').forEach(b => {
+    b.addEventListener('click', () => {
+      if (b.dataset.confirming === '1') {
+        clearTimeout(Number(b.dataset.timer));
+        deleteMatch(b.dataset.id);
+        return;
+      }
+      b.dataset.confirming = '1';
+      b.textContent = '¿Seguro? Sí, borrar';
+      const timer = setTimeout(() => {
+        b.dataset.confirming = '';
+        b.textContent = 'Eliminar';
+      }, 3000);
+      b.dataset.timer = String(timer);
+    });
+  });
 
   // rival selector
   const rivals = [...new Set(matches.map(m => m.rival))].sort((a,b) => a.localeCompare(b));
@@ -1061,6 +1268,11 @@ function renderMatchesPage(){
 
   // datalist para el formulario de subida
   document.getElementById('rivalList').innerHTML = rivals.map(r => `<option value="${esc(r)}">`).join('');
+
+  // datalist de competiciones: sin sugerencias de partida — se rellena solo
+  // con las que se vayan escribiendo y guardando en partidos.
+  const comps = [...new Set(matches.map(m => m.competition).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+  document.getElementById('compList').innerHTML = comps.map(c => `<option value="${esc(c)}">`).join('');
 }
 
 function fmtDate(iso){
@@ -1073,7 +1285,6 @@ function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<
 function deleteMatch(id){
   const m = matches.find(x => x.id === id);
   if (!m) return;
-  if (!confirm(`¿Eliminar el partido vs ${m.rival} (${fmtDate(m.date)})? Esta acción no se puede deshacer.`)) return;
   matches = matches.filter(x => x.id !== id);
   saveMatches(matches);
   renderMatchesPage();
@@ -1180,6 +1391,11 @@ function handleFile(file){
       if (result.unknownSystems.length) {
         html += `<div class="banner warn"><div><b>${result.unknownSystems.length} sistema(s) nuevo(s)</b> sin fase asignada — se guardarán como «SETS» por defecto. Puedes corregirlos luego en Configuración:<ul>${result.unknownSystems.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div></div>`;
       }
+      const ownSet = new Set(ownRoster.map(s => s.toUpperCase()));
+      const unknownPlayers = collectUnknownPlayers(result.plays, aliasMap).filter(c => !ownSet.has(c));
+      if (unknownPlayers.length) {
+        html += `<div class="banner warn"><div><b>${unknownPlayers.length} código(s) de jugadora nuevo(s)</b>, no reconocidos como plantilla propia — se contarán como rival en el informe. Si alguno es tuyo, añádelo en Configuración → «Plantilla propia»:<ul>${unknownPlayers.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div></div>`;
+      }
       banner.innerHTML = html;
       document.getElementById('btnGuardar').disabled = false;
     } catch (err) {
@@ -1195,7 +1411,7 @@ document.getElementById('btnGuardar').addEventListener('click', () => {
   if (!pendingParsed) return;
   const date = document.getElementById('inpDate').value;
   const rival = document.getElementById('inpRival').value.trim();
-  const competition = document.getElementById('inpComp').value;
+  const competition = document.getElementById('inpComp').value.trim();
   if (!rival) { alert('Indica el rival del partido.'); return; }
   if (!date) { alert('Indica la fecha del partido.'); return; }
 
@@ -1220,6 +1436,7 @@ document.getElementById('btnGuardar').addEventListener('click', () => {
   pendingParsed = null;
   document.getElementById('inpDate').value = '';
   document.getElementById('inpRival').value = '';
+  document.getElementById('inpComp').value = '';
   document.getElementById('fileName').textContent = '';
   document.getElementById('uploadBanner').innerHTML = '';
   document.getElementById('btnGuardar').disabled = true;
@@ -1232,6 +1449,8 @@ document.getElementById('btnGuardar').addEventListener('click', () => {
    Página: Configuración
    ============================================================ */
 function renderConfigPage(){
+  document.getElementById('ownRosterInput').value = ownRoster.join(', ');
+
   const allSystems = [...new Set(matches.flatMap(m => m.plays.map(p => p.system)))].sort();
   const sysBody = document.getElementById('cfgSysBody');
   sysBody.innerHTML = '';
@@ -1261,6 +1480,13 @@ function renderConfigPage(){
     plBody.appendChild(tr);
   }
 }
+
+document.getElementById('btnGuardarRoster').addEventListener('click', () => {
+  const raw = document.getElementById('ownRosterInput').value;
+  ownRoster = raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  saveOwnRoster(ownRoster);
+  alert('Plantilla propia guardada. Se aplicará al volver a abrir cualquier informe.');
+});
 
 document.getElementById('btnGuardarCfg').addEventListener('click', () => {
   document.querySelectorAll('#cfgSysBody select[data-sys]').forEach(sel => { categoryMap[sel.dataset.sys] = sel.value; });
@@ -1343,49 +1569,52 @@ function makePrintColumns(listEl, allowSplit = true){
   wrap.style.display = prevDisplay;
 }
 
-function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
-  // La página tiene que estar visible ANTES de construir las listas: varias
-  // filas miden su ancho real en pantalla (fitFlexCol/fitNameColumn) para que
-  // los nombres no se corten y las barras empiecen/acaben todas en el mismo
-  // sitio; con la página oculta (display:none) esas medidas dan 0 y el ajuste
-  // no sirve de nada. Por eso showPage() se llama aquí, al principio, y no al
-  // final como antes.
-  showPage('pageReport');
+const OWN_IDS = {
+  kpiStrip:'kpiStrip', sysCount:'sysCount', sysList:'sysList', shotSysCount:'shotSysCount', shotSysList:'shotSysList',
+  finCount:'finCount', finList:'finList', genList:'genList', rebList:'rebList',
+  pairsCount:'pairsCount', pairsBody:'pairsBody',
+  toList:'toList', toSysList:'toSysList', foulList:'foulList', foulSysList:'foulSysList',
+  dashFooter:'dashFooter', tbody:'tbody'
+};
+const RIVAL_IDS = {
+  kpiStrip:'kpiStripRival', sysCount:'sysCountRival', sysList:'sysListRival', shotSysCount:'shotSysCountRival', shotSysList:'shotSysListRival',
+  finCount:'finCountRival', finList:'finListRival', genList:'genListRival', rebList:'rebListRival',
+  pairsCount:'pairsCountRival', pairsBody:'pairsBodyRival',
+  toList:'toListRival', toSysList:'toSysListRival', foulList:'foulListRival', foulSysList:'foulSysListRival',
+  dashFooter:'dashFooterRival', tbody:'tbodyRival'
+};
+const CAT_CLASS = { 'FASTBREAK':'c-fast','TRANSITION':'c-trans','OFFENSIVE REBOUND':'c-oreb','SETS':'c-sets','SIDELINES':'c-side','BASELINES':'c-base' };
+const pctFmt = (n) => n===null ? '<span class="dim">—</span>' : (n.toFixed(1)+'%');
+const oerClass = (oer) => oer >= 1.0 ? 'oer-good' : (oer < 0.6 ? 'oer-bad' : '');
 
-  const named = resolvePlayNames(rawPlays, aliasMap);
-  const plays = applyCategoryMap(named, categoryMap);
-
-  document.getElementById('repTitle').textContent = title;
-  document.getElementById('repSubtitle').textContent = subtitle;
-  document.getElementById('repMeta').textContent = metaLabel || '';
-
-  // reset tabs to first view
-  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===0));
-  document.querySelectorAll('#pageReport .view').forEach((v,i) => v.classList.toggle('active', i===0));
-
-  const kpi = computeKPIs(plays, rivalOffReb);
+// Rellena TODAS las secciones del informe (KPIs, sistemas, acierto,
+// finalizadoras/generadoras, parejas, rebote/pérdidas/faltas y tabla OER)
+// para un conjunto de jugadas (propias o rivales) sobre el juego de ids que
+// le corresponde (OWN_IDS o RIVAL_IDS). `opts.fake*` solo se usa para el
+// informe propio (ver comentario histórico más abajo).
+function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
+  const kpi = computeKPIs(plays, oppOffRebCount);
   const kpis = [
     {v: kpi.totalShots, l:'Tiros totales', sub: `${kpi.totalMade} anotados`, cls:'accent'},
     {v: Math.round(kpi.pctGlobal*100)+'%', l:'% acierto global', sub:`${kpi.totalMade}/${kpi.totalShots}`, cls:'good'},
     {v: Math.round(kpi.pctT2*100)+'%', l:'% acierto T2', sub:`${kpi.t2m}/${kpi.t2a}`},
     {v: Math.round(kpi.pctT3*100)+'%', l:'% acierto T3', sub:`${kpi.t3m}/${kpi.t3a}`},
-    {v: kpi.ownOffReb, l:'Rebotes ofens.', sub:`vs ${kpi.rivalOffReb} del rival`},
+    {v: kpi.ownOffReb, l:'Rebotes ofens.', sub: `vs ${kpi.rivalOffReb}${opts.rebSubSuffix || ' del rival'}`},
     {v: kpi.turnovers, l:'Pérdidas', sub:'balones perdidos', cls:'critical'},
     {v: kpi.foulsDrawn, l:'Faltas provocadas', sub:'incl. tiro', cls:'good'},
   ];
-  document.getElementById('kpiStrip').innerHTML = kpis.map(k => `<div class="kpi ${k.cls||''}"><div class="val">${k.v}</div><div class="lbl">${k.l}</div><div class="sub">${k.sub}</div></div>`).join('');
+  document.getElementById(ids.kpiStrip).innerHTML = kpis.map(k => `<div class="kpi ${k.cls||''}"><div class="val">${k.v}</div><div class="lbl">${k.l}</div><div class="sub">${k.sub}</div></div>`).join('');
 
   // sistemas más usados
-  // Los 3 "window.__fake*" permiten sustituir, solo para una exportación
-  // puntual a PDF, los datos de sistemas/acierto/eficiencia por unos fijados
-  // a mano (p.ej. para que cuadren con una fuente externa ya verificada),
-  // sin tocar el análisis real que ve la app en pantalla. Si no están
-  // definidos, se usan los datos calculados de siempre.
-  const sysEntries = window.__fakeSys || systemUsage(plays);
-  const sysPlaysCount = window.__fakeSys ? sysEntries.reduce((s, [, n]) => s + n, 0) : plays.length;
-  document.getElementById('sysCount').textContent = `(${sysEntries.length} sistemas · ${sysPlaysCount} jugadas)`;
+  // Los 3 "opts.fake*" permiten sustituir, solo para una exportación puntual
+  // a PDF del informe PROPIO, los datos de sistemas/acierto/eficiencia por
+  // unos fijados a mano (p.ej. para que cuadren con una fuente externa ya
+  // verificada), sin tocar el análisis real que ve la app en pantalla.
+  const sysEntries = opts.fakeSys || systemUsage(plays);
+  const sysPlaysCount = opts.fakeSys ? sysEntries.reduce((s, [, n]) => s + n, 0) : plays.length;
+  document.getElementById(ids.sysCount).textContent = `(${sysEntries.length} sistemas · ${sysPlaysCount} jugadas)`;
   const maxSys = sysEntries.length ? sysEntries[0][1] : 1;
-  const sysList = document.getElementById('sysList'); sysList.innerHTML = '';
+  const sysList = document.getElementById(ids.sysList); sysList.innerHTML = '';
   sysEntries.forEach(([name, n]) => {
     const w = Math.max(3, Math.round((n/maxSys)*100));
     const row = document.createElement('div'); row.className = 'rank-row';
@@ -1397,9 +1626,9 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
   makePrintColumns(sysList);
 
   // acierto por sistema
-  const shotSys = window.__fakeShotSys || shotAccuracyBySystem(plays, 1);
-  document.getElementById('shotSysCount').textContent = `(${shotSys.length} sistemas)`;
-  const shotSysList = document.getElementById('shotSysList'); shotSysList.innerHTML = '';
+  const shotSys = opts.fakeShotSys || shotAccuracyBySystem(plays, 1);
+  document.getElementById(ids.shotSysCount).textContent = `(${shotSys.length} sistemas)`;
+  const shotSysList = document.getElementById(ids.shotSysList); shotSysList.innerHTML = '';
   shotSys.forEach(d => {
     const madeW = Math.round(d.pct*100), missW = 100-madeW;
     const row = document.createElement('div'); row.className = 'stack-row';
@@ -1413,8 +1642,8 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
 
   // finalizadoras
   const finEntries = finalizadoras(plays);
-  document.getElementById('finCount').textContent = `(${finEntries.length} jugadoras)`;
-  const finList = document.getElementById('finList'); finList.innerHTML = '';
+  document.getElementById(ids.finCount).textContent = `(${finEntries.length} jugadoras)`;
+  const finList = document.getElementById(ids.finList); finList.innerHTML = '';
   finEntries.forEach(d => {
     const madeW = Math.round(d.pct*100);
     const t2mW = Math.round((d.t2m/d.att)*100), t2missW = Math.round(((d.t2a-d.t2m)/d.att)*100);
@@ -1437,7 +1666,7 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
   // generadoras
   const genEntries = generadoras(plays);
   const maxGen = Math.max(1, ...genEntries.map(d => d.n));
-  const genList = document.getElementById('genList'); genList.innerHTML = '';
+  const genList = document.getElementById(ids.genList); genList.innerHTML = '';
   genEntries.forEach(d => {
     const w = Math.max(3, Math.round((d.n/maxGen)*100));
     const madeW = Math.round((d.made/d.n)*w);
@@ -1452,7 +1681,7 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
   // rebote ofensivo (rendimiento: cuántos de esos rebotes acaban en canasta)
   const rebEntries = reboteOfensivo(plays);
   const maxReb = Math.max(1, ...rebEntries.map(d => d.n));
-  const rebList = document.getElementById('rebList'); rebList.innerHTML = '';
+  const rebList = document.getElementById(ids.rebList); rebList.innerHTML = '';
   rebEntries.forEach(d => {
     const w = Math.max(3, Math.round((d.n/maxReb)*100));
     const madeW = Math.round((d.made/d.n)*w);
@@ -1467,8 +1696,8 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
   // parejas destacadas
   const pairs = pairRelations(plays);
   const featured = pairs.filter(p => p.n >= 2);
-  document.getElementById('pairsCount').textContent = `(${featured.length} de ${pairs.length} combinaciones distintas, con 2+ jugadas juntas)`;
-  const pairsBody = document.getElementById('pairsBody'); pairsBody.innerHTML = '';
+  document.getElementById(ids.pairsCount).textContent = `(${featured.length} de ${pairs.length} combinaciones distintas, con 2+ jugadas juntas)`;
+  const pairsBody = document.getElementById(ids.pairsBody); pairsBody.innerHTML = '';
   featured.forEach(p => {
     const tr = document.createElement('tr');
     const shotTxt = p.attempts ? `${p.made}/${p.attempts}` : '<span class="dim">sin tiro</span>';
@@ -1481,23 +1710,20 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
   });
 
   // pérdidas / faltas — por jugadora y por sistema
-  const toList = document.getElementById('toList'); toList.innerHTML = '';
+  const toList = document.getElementById(ids.toList); toList.innerHTML = '';
   turnoversByPlayer(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; toList.appendChild(li); });
-  const toSysList = document.getElementById('toSysList'); toSysList.innerHTML = '';
+  const toSysList = document.getElementById(ids.toSysList); toSysList.innerHTML = '';
   turnoversBySystem(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; toSysList.appendChild(li); });
-  const foulList = document.getElementById('foulList'); foulList.innerHTML = '';
+  const foulList = document.getElementById(ids.foulList); foulList.innerHTML = '';
   foulsByPlayer(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; foulList.appendChild(li); });
-  const foulSysList = document.getElementById('foulSysList'); foulSysList.innerHTML = '';
+  const foulSysList = document.getElementById(ids.foulSysList); foulSysList.innerHTML = '';
   foulsBySystem(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; foulSysList.appendChild(li); });
 
-  document.getElementById('dashFooter').innerHTML = `<b>Cómo leer este informe:</b> ${plays.length} jugadas ofensivas analizadas${rivalOffReb!==undefined?` · ${rivalOffReb} rebotes ofensivos del rival`:''}. «Generadora» (GEN) es quien crea o inicia la jugada, «Finalizadora» (FIN) quien tira, y «Rebote» (REB) quien captura el rebote ofensivo, según el descriptor de jugadoras de Nacsport. T2/T3 y el resultado (C = convertido, F = fallado) proceden de los descriptores de la categoría.`;
+  document.getElementById(ids.dashFooter).innerHTML = opts.footerHtml || `<b>Cómo leer este informe:</b> ${plays.length} jugadas ofensivas analizadas · ${kpi.rivalOffReb} rebotes ofensivos del oponente en estas jugadas. «Generadora» (GEN) es quien crea o inicia la jugada, «Finalizadora» (FIN) quien tira, y «Rebote» (REB) quien captura el rebote ofensivo, según el descriptor de jugadoras de Nacsport. T2/T3 y el resultado (C = convertido, F = fallado) proceden de los descriptores de la categoría.`;
 
   // tabla OER
-  const CAT_CLASS = { 'FASTBREAK':'c-fast','TRANSITION':'c-trans','OFFENSIVE REBOUND':'c-oreb','SETS':'c-sets','SIDELINES':'c-side','BASELINES':'c-base' };
-  const table = window.__fakeTable || categoryTable(plays);
-  const tbody = document.getElementById('tbody'); tbody.innerHTML = '';
-  const pctFmt = (n) => n===null ? '<span class="dim">—</span>' : (n.toFixed(1)+'%');
-  const oerClass = (oer) => oer >= 1.0 ? 'oer-good' : (oer < 0.6 ? 'oer-bad' : '');
+  const table = opts.fakeTable || categoryTable(plays);
+  const tbody = document.getElementById(ids.tbody); tbody.innerHTML = '';
   table.forEach(block => {
     const cls = CAT_CLASS[block.cat] || 'c-sets';
     block.rows.forEach((r,i) => {
@@ -1517,6 +1743,69 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
       <td>${block.subtotal.exito}/${block.subtotal.total}</td><td>${pctFmt(block.subtotal.pct_exito)}</td>`;
     tbody.appendChild(sub);
   });
+}
+
+function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel){
+  // La página tiene que estar visible ANTES de construir las listas: varias
+  // filas miden su ancho real en pantalla (fitFlexCol/fitNameColumn) para que
+  // los nombres no se corten y las barras empiecen/acaben todas en el mismo
+  // sitio; con la página oculta (display:none) esas medidas dan 0 y el ajuste
+  // no sirve de nada. Por eso showPage() se llama aquí, al principio, y no al
+  // final como antes.
+  showPage('pageReport');
+
+  // Separación propio / rival: se hace sobre los códigos CRUDOS de jugadora
+  // (gen/fin/reb, antes de resolver alias), comparándolos con la plantilla
+  // propia configurada en «Configuración». Ver comentario en classifyTeam().
+  const ownSet = new Set(ownRoster.map(s => s.toUpperCase()));
+  const ownRaw = rawPlays.filter(p => classifyTeam(p, ownSet) === 'own');
+  const rivalRaw = rawPlays.filter(p => classifyTeam(p, ownSet) === 'rival');
+  const hasRival = rivalRaw.length > 0;
+
+  const plays = applyCategoryMap(resolvePlayNames(ownRaw, aliasMap), categoryMap);
+  const rivalPlays = applyCategoryMap(resolvePlayNames(rivalRaw, aliasMap), categoryMap);
+
+  // Rebotes ofensivos del oponente en el bloque que se está mostrando: si hay
+  // jugadas del rival identificadas por jugadora, se cuentan de esa forma
+  // (más precisas); si no (partido antiguo sin plantilla rival), se usa el
+  // contador histórico basado en la etiqueta "POST REB OFF RIVAL".
+  const rivalRebCount = hasRival ? rivalPlays.filter(p => p.reb).length : (rivalOffReb || 0);
+  const ownRebCount = ownRaw.length ? plays.filter(p => p.reb).length : 0;
+
+  document.getElementById('repTitle').textContent = title;
+  document.getElementById('repSubtitle').textContent = subtitle;
+  document.getElementById('repMeta').textContent = metaLabel || '';
+
+  // mostrar/ocultar las pestañas y vistas del rival según si este partido (o
+  // acumulado) tiene jugadas rivales identificadas
+  document.getElementById('tabRivalDash').classList.toggle('hidden', !hasRival);
+  document.getElementById('tabRivalTable').classList.toggle('hidden', !hasRival);
+  document.getElementById('viewDashboardRival').classList.toggle('no-rival', !hasRival);
+  document.getElementById('viewTableRival').classList.toggle('no-rival', !hasRival);
+
+  // Solo la primera vista (.view.active) es visible en pantalla; las otras 3
+  // tienen display:none. fitFlexCol/makePrintColumns miden el ancho real en
+  // pantalla de CADA lista que rellenan (igual que con showPage más arriba),
+  // así que mientras se construyen las 4 vistas hay que forzarlas todas
+  // visibles — si no, las listas de cualquier vista que no sea la activa (el
+  // resumen y la tabla del rival, normalmente) se quedan sin alinear porque
+  // sus medidas dan 0. Se restaura el estado normal de pestañas al final.
+  const views = [...document.querySelectorAll('#pageReport .view')];
+  views.forEach(v => { v.style.display = 'block'; });
+
+  fillReportSection(plays, OWN_IDS, rivalRebCount, {
+    fakeSys: window.__fakeSys, fakeShotSys: window.__fakeShotSys, fakeTable: window.__fakeTable
+  });
+
+  if (hasRival) {
+    fillReportSection(rivalPlays, RIVAL_IDS, ownRebCount, { rebSubSuffix: ' nuestro' });
+  }
+
+  // reset tabs to first view (y quita el display:block forzado, para que
+  // vuelva a mandar la clase .active de siempre)
+  views.forEach(v => { v.style.display = ''; });
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+  views.forEach((v,i) => v.classList.toggle('active', i===0));
 }
 
 /* ============================================================
