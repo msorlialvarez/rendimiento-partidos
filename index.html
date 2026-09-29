@@ -1944,7 +1944,7 @@ function extractPrintCss(){
 // Elementos que no deben partirse a media altura entre dos páginas del PDF.
 const PDF_SAFE_SEL = '.rank-row, .stack-row, .li, .card, .kpi, .pairs-table tr, ' +
   '#viewTable tbody tr, #viewTableRival tbody tr, .page-footer, ' +
-  'section:has(.pairs-table), section:has(.small-list)';
+  'section:has(.pairs-table), section:has(.small-list), .grid-2, .grid-3';
 // Elementos que SIEMPRE empiezan página nueva (mismo criterio que @media print).
 const PDF_FORCED_SEL = '#viewTable, #viewDashboardRival, #viewTableRival';
 
@@ -2062,8 +2062,20 @@ async function exportPdf(scope){
       } else if (next < totalLogical - 0.5) {
         const crossing = breakpoints.filter(b => b.top < next - 0.5 && b.bottom > next + 0.5);
         if (crossing.length) {
+          // Antes, si el elemento protegido empezaba a menos de 20px del
+          // inicio de la página (y), se descartaba el ajuste "para no
+          // desperdiciar una página casi vacía" — pero eso es exactamente lo
+          // que provocaba el corte a media altura de Finalizadoras/
+          // Generadoras: con "Acierto de tiro por sistema" ocupando más
+          // espacio en partidos con muchos sistemas, el bloque de
+          // Finalizadoras+Generadoras (protegido entero como .grid-2)
+          // empezaba a menos de 20px del corte natural, así que se ignoraba
+          // la protección y se partía por la mitad. Mejor una página con
+          // poco contenido que un elemento protegido partido: siempre se
+          // respeta el ajuste, y el único límite es el de abajo (next <=
+          // y+0.5) que evita bucles cuando el propio elemento no cabe nunca.
           const minTop = Math.min(...crossing.map(b => b.top));
-          if (minTop > y + 20) next = minTop;
+          next = minTop;
         }
       }
       if (next <= y + 0.5) next = Math.min(y + pageBudgetLogical, totalLogical);
