@@ -410,7 +410,7 @@
     <h2>Partidos guardados <span class="count" id="matchesCount"></span></h2>
     <div class="card" style="padding:0; overflow-x:auto;">
       <table class="simple" id="matchesTable">
-        <thead><tr><th>Fecha</th><th>Rival</th><th>Competición</th><th>Jugadas</th><th>Puntos</th><th>OER</th><th></th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Rival</th><th>Competición</th><th>Jugadas</th><th>Posesiones</th><th>Puntos</th><th>OER</th><th></th></tr></thead>
         <tbody id="matchesBody"></tbody>
       </table>
       <div class="empty-note" id="emptyNote" style="display:none;">Todavía no has subido ningún partido. Ve a «Subir partido» para empezar.</div>
@@ -1273,26 +1273,37 @@ function renderMatchesPage(){
   document.getElementById('matchesCount').textContent = `(${matches.length})`;
   document.getElementById('emptyNote').style.display = matches.length ? 'none' : 'block';
 
-  // "Jugadas"/"Puntos"/"OER" en esta lista son SOLO del rendimiento propio
-  // (para eso sirve la tabla: seguimiento de nuestro equipo partido a
-  // partido) — hay que descartar las jugadas del rival antes de sumar, si
-  // no, un partido con seguimiento del rival cuenta el doble de jugadas y
-  // mezcla los puntos de ambos equipos en un único número sin sentido.
+  // "Jugadas"/"Posesiones"/"Puntos"/"OER" en esta lista son SOLO del
+  // rendimiento propio (para eso sirve la tabla: seguimiento de nuestro
+  // equipo partido a partido) — hay que descartar las jugadas del rival
+  // antes de sumar, si no, un partido con seguimiento del rival cuenta el
+  // doble de jugadas y mezcla los puntos de ambos equipos en un único
+  // número sin sentido.
+  //
+  // OJO: el OER de aquí tiene que salir EXACTAMENTE igual que el del
+  // detalle del partido (buildReport → computeKPIs), que usa la fórmula de
+  // posesiones (tiros de campo + pérdidas + 0,44×tiros libres − rebotes
+  // ofensivos propios), NO puntos/nº de jugadas — antes se calculaba así de
+  // simplificado aquí y por eso no coincidía con el que se ve al entrar en
+  // el partido.
   const ownSetList = new Set(ownRoster.map(s => s.toUpperCase()));
   const sorted = [...matches].sort((a,b) => (b.date||'').localeCompare(a.date||''));
   for (const m of sorted) {
     const ownRaw = m.plays.filter(p => classifyTeam(p, ownSetList) === 'own');
-    const named = resolvePlayNames(ownRaw, aliasMap);
-    const categorized = applyCategoryMap(named, categoryMap);
-    const pts = categorized.reduce((a,p) => a + p.pts, 0);
-    const oer = ownRaw.length ? (pts / ownRaw.length) : 0;
+    const rivalRaw = m.plays.filter(p => classifyTeam(p, ownSetList) === 'rival');
+    const hasRival = rivalRaw.length > 0;
+    const categorized = applyCategoryMap(resolvePlayNames(ownRaw, aliasMap), categoryMap);
+    const rivalCategorized = applyCategoryMap(resolvePlayNames(rivalRaw, aliasMap), categoryMap);
+    const rivalRebCount = hasRival ? rivalCategorized.filter(p => p.reb).length : (m.rivalOffReb || 0);
+    const kpi = computeKPIs(categorized, rivalRebCount);
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="mono">${fmtDate(m.date)}</td>
       <td class="rival">${esc(m.rival)}</td>
       <td><span class="pill">${esc(m.competition||'—')}</span></td>
       <td class="mono">${ownRaw.length}</td>
-      <td class="mono">${pts}</td>
-      <td class="mono">${oer.toFixed(2)}</td>
+      <td class="mono">${kpi.possessions.toFixed(1)}</td>
+      <td class="mono">${kpi.pts}</td>
+      <td class="mono">${kpi.oer.toFixed(2)}</td>
       <td class="row-actions">
         <button class="btn-view" data-id="${m.id}">Ver</button>
         <button class="del" data-id="${m.id}">Eliminar</button>
@@ -1958,8 +1969,19 @@ function pdfHeadingGroups(clonedEl, rootTop){
     const h2r = h2.getBoundingClientRect();
     let top = h2r.top - rootTop, bottom = h2r.bottom - rootTop;
     if (contentEl) {
-      const firstRow = contentEl.querySelector('.rank-row, .stack-row, .li, tr, .kpi') || contentEl;
-      const fr = firstRow.getBoundingClientRect();
+      // ojo: las listas con makePrintColumns tienen el .rowlist original
+      // oculto (display:none en impresión) y las filas que de verdad se ven
+      // están en un .print-cols hermano insertado después — un querySelector
+      // normal encuentra antes las filas ocultas (con getBoundingClientRect
+      // a cero) y la protección no hacía nada. Aquí se descartan las que no
+      // ocupan espacio real y se usa la primera fila REALMENTE visible.
+      const candidates = [...contentEl.querySelectorAll('.rank-row, .stack-row, .li, tr, .kpi')];
+      let fr = null;
+      for (const cand of candidates) {
+        const r = cand.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) { fr = r; break; }
+      }
+      if (!fr) fr = contentEl.getBoundingClientRect();
       bottom = Math.max(bottom, fr.bottom - rootTop);
     }
     groups.push({ top, bottom });
