@@ -176,11 +176,16 @@
   .view{ display:none; }
   .view.active{ display:block; }
 
-  .kpis{ display:grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr)); gap:1px; background: var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-block-end: 32px; }
-  .kpi{ background: var(--surface); padding:16px 14px; }
-  .kpi .val{ font-family:"IBM Plex Mono",monospace; font-size:26px; font-weight:600; line-height:1; }
-  .kpi .lbl{ font-size:11px; color:var(--ink-3); text-transform:uppercase; letter-spacing:0.06em; margin-block-start:6px; }
-  .kpi .sub{ font-size:11px; color:var(--ink-2); margin-block-start:2px; }
+  /* Las 9 tarjetas caben siempre en una única fila (grid-auto-flow:column con
+     9 columnas implícitas, en vez de auto-fit, que envolvía a 2 filas en
+     pantallas más estrechas). Si el hueco disponible es menor que el ancho
+     mínimo de las 9 juntas, se hace scroll horizontal en vez de partir la
+     fila. */
+  .kpis{ display:grid; grid-auto-flow:column; grid-auto-columns: minmax(96px,1fr); gap:1px; background: var(--line); border:1px solid var(--line); border-radius:10px; overflow-x:auto; margin-block-end: 32px; }
+  .kpi{ background: var(--surface); padding:12px 8px; min-width:0; }
+  .kpi .val{ font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600; line-height:1.05; }
+  .kpi .lbl{ font-size:8.8px; color:var(--ink-3); text-transform:uppercase; letter-spacing:0.03em; margin-block-start:5px; }
+  .kpi .sub{ font-size:8.8px; color:var(--ink-2); margin-block-start:2px; }
   .kpi.accent .val{ color: var(--accent); }
   .kpi.good .val{ color: var(--good); }
   .kpi.critical .val{ color: var(--critical); }
@@ -285,12 +290,15 @@
     .report-sub{ display:block; font-size:10.5px; }
     .top-meta{ font-size:9px; }
 
-    /* KPIs siguen siendo el titular de la página: se quedan grandes. */
+    /* KPIs siguen siendo el titular de la página, siempre en una sola fila
+       (ver regla base .kpis, con grid-auto-flow:column) — aquí solo se
+       reduce un poco más el tamaño para que las 9 tarjetas quepan holgadas
+       en el ancho útil de A4 horizontal. */
     .kpis{ margin-block-end:10px; }
-    .kpi{ padding:6px 10px; }
-    .kpi .val{ font-size:19px; }
-    .kpi .lbl{ font-size:8px; margin-block-start:3px; }
-    .kpi .sub{ font-size:8px; }
+    .kpi{ padding:5px 6px; }
+    .kpi .val{ font-size:15px; }
+    .kpi .lbl{ font-size:7.2px; margin-block-start:2px; }
+    .kpi .sub{ font-size:7.2px; }
 
     /* Las secciones largas pueden partirse entre páginas (evita dejar
        huecos en blanco); lo que sí se protege es la fila individual
@@ -747,6 +755,11 @@
     </div>
   </div>
 </div>
+
+<!-- jsPDF: genera el PDF por código (texto y formas vectoriales dibujados
+     directamente), así la descarga es un archivo real desde el primer clic,
+     sin pasar por el diálogo de "Imprimir" del navegador. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
 /* ============================================================
@@ -1211,6 +1224,9 @@ let matches = loadMatches();
 let categoryMap = loadCategoryMap();
 let aliasMap = loadAliasMap();
 let ownRoster = loadOwnRoster();
+// Datos del informe actualmente abierto, para poder generar el PDF (ver
+// exportPdf/buildPdfReport) sin depender de lo que haya en pantalla.
+let currentReport = null;
 
 /* ============================================================
    Navegación entre páginas
@@ -1731,8 +1747,9 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
 
   // parejas destacadas
   const pairs = pairRelations(plays);
-  const featured = pairs.filter(p => p.n >= 2);
-  document.getElementById(ids.pairsCount).textContent = `(${featured.length} de ${pairs.length} combinaciones distintas, con 2+ jugadas juntas)`;
+  const featuredAll = pairs.filter(p => p.n >= 2);
+  const featured = featuredAll.slice(0, 10);
+  document.getElementById(ids.pairsCount).textContent = `(Top ${featured.length} de ${featuredAll.length} combinaciones con 2+ jugadas juntas)`;
   const pairsBody = document.getElementById(ids.pairsBody); pairsBody.innerHTML = '';
   featured.forEach(p => {
     const tr = document.createElement('tr');
@@ -1850,68 +1867,387 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLab
   views.forEach(v => { v.style.display = ''; });
   document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===0));
   views.forEach((v,i) => v.classList.toggle('active', i===0));
+
+  // Se guarda todo lo necesario para regenerar el PDF (ver exportPdf/
+  // buildPdfReport más abajo): el PDF ya no se genera "imprimiendo" el DOM,
+  // se dibuja con jsPDF directamente a partir de estos mismos datos, así que
+  // no hace falta leer nada de la pantalla.
+  currentReport = {
+    title, subtitle, metaLabel, rivalLabel, hasRival,
+    plays, rivalPlays, rivalRebCount, ownRebCount
+  };
 }
 
 /* ============================================================
-   Ajuste automático del PDF a un máximo de 6 páginas
+   Exportación a PDF — dibujado con jsPDF (descarga automática real)
    ============================================================
-   Cada informe imprime hasta 4 bloques (resumen propio, tabla propia,
-   resumen rival, tabla rival), cada uno forzado a empezar en página nueva
-   (ver "break-before: page" en el CSS de impresión). Con partidos/temporadas
-   con muchos sistemas o jugadoras, cualquiera de esos bloques puede desbordar
-   más páginas de las deseadas. Para que el PDF NUNCA pase de 6 páginas (o de
-   3 cuando no hay rival), se limita cada resumen a un máximo de 2 páginas y
-   cada tabla a 1, reduciendo el zoom del bloque justo antes de imprimir si
-   hace falta — con "zoom" (no "transform"), que si reduce el alto real que
-   ocupa el contenido a efectos de paginación, al contrario que transform. */
-const PRINT_PAGE_HEIGHT_PX = 718; // alto útil de A4 horizontal con márgenes de 10mm, a 96px/pulgada
-function fitPrintBlock(id, maxPages){
-  const el = document.getElementById(id);
-  if (!el || el.classList.contains('no-rival')) return;
-  el.style.zoom = '';
-  // getBoundingClientRect().height, no scrollHeight: "zoom" reduce el hueco
-  // que el bloque ocupa visto desde fuera (lo que decide cuántas páginas
-  // ocupa al imprimir), pero scrollHeight sigue devolviendo el alto interno
-  // sin aplicar zoom — con scrollHeight el cálculo del factor de reducción
-  // sale mal.
-  // El factor 0.8 (en vez de dejar el presupuesto justo) da margen para el
-  // hueco muerto que dejan las secciones protegidas contra corte a mitad
-  // (break-inside: avoid, en parejas / rebote-pérdidas-faltas): cuando una de
-  // esas no cabe entera en lo que queda de página salta completa a la
-  // siguiente, y ese hueco no lo refleja la altura total medida aquí.
-  const budget = PRINT_PAGE_HEIGHT_PX * maxPages * 0.72;
-  const h = el.getBoundingClientRect().height;
-  if (h > budget) {
-    el.style.zoom = Math.max(0.35, budget / h);
+   Antes el PDF salía "imprimiendo" el DOM con window.print(): eso SIEMPRE
+   exige el diálogo nativo del navegador, no hay forma de evitarlo desde
+   JavaScript (es una restricción de seguridad del propio Chrome). Aquí en
+   cambio el PDF se dibuja de cero con jsPDF — texto y formas vectoriales,
+   por código — a partir de los mismos datos ya calculados para la pantalla
+   (computeKPIs, systemUsage, categoryTable, etc.), y se descarga con
+   pdf.save(), como un archivo normal, sin ningún diálogo intermedio. */
+
+function hexToRgb(hex){
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+const PDF_C = {
+  ink: hexToRgb('#18140f'), ink2: hexToRgb('#5c554a'), ink3: hexToRgb('#8f877a'),
+  line: hexToRgb('#e4ddd0'), white: [255, 255, 255],
+  accent: hexToRgb('#e2571f'), accentWash: hexToRgb('#fbe4d7'),
+  good: hexToRgb('#0ca30c'), miss: hexToRgb('#c7bfb0'),
+  three: hexToRgb('#2b6ca3'), threeWash: hexToRgb('#cddef0'),
+  critical: hexToRgb('#c73b3b'), subtotalBg: hexToRgb('#efeae1'),
+  cat: {
+    'FASTBREAK': [hexToRgb('#e4f0d9'), hexToRgb('#3a5d24')],
+    'TRANSITION': [hexToRgb('#f7dfe0'), hexToRgb('#8a3232')],
+    'OFFENSIVE REBOUND': [hexToRgb('#fbdfc0'), hexToRgb('#8a5416')],
+    'SETS': [hexToRgb('#dde7f5'), hexToRgb('#31517e')],
+    'SIDELINES': [hexToRgb('#fbeccb'), hexToRgb('#8a6316')],
+    'BASELINES': [hexToRgb('#f3dede'), hexToRgb('#8a3232')]
   }
+};
+const PDF_W = 297, PDF_H = 210, PDF_M = 9, PDF_CW = PDF_W - 2 * PDF_M;
+
+function pdfTruncate(pdf, text, maxW){
+  text = String(text == null ? '' : text);
+  if (pdf.getTextWidth(text) <= maxW) return text;
+  while (text.length > 1 && pdf.getTextWidth(text + '…') > maxW) text = text.slice(0, -1);
+  return text + '…';
 }
-// El ajuste se dispara desde el propio botón "Exportar a PDF" (no del evento
-// "beforeprint": con la exportación automatizada a PDF ese evento no llega a
-// dispararse, y depender de él es frágil). El zoom se deshace al volver de
-// imprimir (evento "afterprint", con un timeout de respaldo por si el
-// navegador no lo dispara).
-// Descarga separada: "own" imprime solo el bloque propio (resumen + tabla,
-// máx. 3 páginas), "rival" solo el bloque del rival (otras máx. 3 páginas) —
-// así salen dos PDF distintos en vez de uno combinado de 6 páginas. El
-// ajuste de zoom se calcula igual en los dos casos, mida lo que mida el otro
-// bloque, porque queda oculto por completo (ver body.print-scope-*).
-function exportPdf(scope){
-  fitPrintBlock('viewDashboard', 2);
-  fitPrintBlock('viewTable', 1);
-  fitPrintBlock('viewDashboardRival', 2);
-  fitPrintBlock('viewTableRival', 1);
-  document.body.classList.toggle('print-scope-own', scope === 'own');
-  document.body.classList.toggle('print-scope-rival', scope === 'rival');
-  window.print();
+// Salta de página cuando lo que queda no llega para "need" mm; devuelve la y
+// a usar (M si ha saltado, o la misma si no hacía falta).
+function pdfEnsure(pdf, y, need){
+  if (y + need > PDF_H - PDF_M) { pdf.addPage(); return PDF_M; }
+  return y;
 }
-function resetPrintZoom(){
-  ['viewDashboard', 'viewTable', 'viewDashboardRival', 'viewTableRival'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.zoom = '';
+function pdfBigHeader(pdf, title, subtitle){
+  pdf.setFillColor(...PDF_C.ink); pdf.rect(0, 0, PDF_W, 19, 'F');
+  pdf.setFillColor(...PDF_C.accent); pdf.rect(0, 19, PDF_W, 1, 'F');
+  pdf.setTextColor(...PDF_C.accent); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5);
+  pdf.text('VALENCIA BASKET · VIDEOANÁLISIS', PDF_M, 6.5);
+  pdf.setTextColor(...PDF_C.white); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(13.5);
+  pdf.text(pdfTruncate(pdf, title || '', PDF_CW), PDF_M, 13.5);
+  if (subtitle) {
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.5);
+    pdf.text(pdfTruncate(pdf, subtitle, PDF_CW), PDF_M, 17.5);
+  }
+  return 19 + 1 + 5.5;
+}
+function pdfSectionTitle(pdf, y, text, note){
+  y = pdfEnsure(pdf, y, 8);
+  pdf.setFillColor(...PDF_C.accent); pdf.rect(PDF_M, y, 0.9, 3.4, 'F');
+  pdf.setTextColor(...PDF_C.ink); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8);
+  pdf.text(String(text).toUpperCase(), PDF_M + 2.3, y + 3);
+  y += 4.8;
+  if (note) {
+    pdf.setTextColor(...PDF_C.ink3); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6);
+    const lines = pdf.splitTextToSize(note, PDF_CW);
+    pdf.text(lines, PDF_M, y + 2.3);
+    y += lines.length * 2.8 + 1.8;
+  }
+  return y;
+}
+function pdfKpiRow(pdf, kpi, y, oppSuffix){
+  const kpis = [
+    { v: kpi.pts, l: 'Puntos', sub: `${kpi.possessions.toFixed(1)} posesiones`, c: 'accent' },
+    { v: kpi.oer.toFixed(2), l: 'OER', sub: 'puntos / posesión', c: kpi.oer >= 1 ? 'good' : (kpi.oer < 0.6 ? 'critical' : 'accent') },
+    { v: kpi.totalShots, l: 'Tiros totales', sub: `${kpi.totalMade} anotados`, c: 'accent' },
+    { v: Math.round(kpi.pctGlobal * 100) + '%', l: '% acierto global', sub: `${kpi.totalMade}/${kpi.totalShots}`, c: 'good' },
+    { v: Math.round(kpi.pctT2 * 100) + '%', l: '% acierto T2', sub: `${kpi.t2m}/${kpi.t2a}`, c: null },
+    { v: Math.round(kpi.pctT3 * 100) + '%', l: '% acierto T3', sub: `${kpi.t3m}/${kpi.t3a}`, c: null },
+    { v: kpi.ownOffReb, l: 'Rebotes ofens.', sub: `vs ${kpi.rivalOffReb}${oppSuffix}`, c: null },
+    { v: kpi.turnovers, l: 'Pérdidas', sub: 'balones perdidos', c: 'critical' },
+    { v: kpi.foulsDrawn, l: 'Faltas provocadas', sub: 'incl. tiro', c: 'good' }
+  ];
+  const n = kpis.length, tileW = PDF_CW / n, tileH = 15.5;
+  y = pdfEnsure(pdf, y, tileH + 5);
+  pdf.setDrawColor(...PDF_C.line); pdf.setLineWidth(0.15);
+  kpis.forEach((k, i) => {
+    const x = PDF_M + i * tileW;
+    pdf.rect(x, y, tileW, tileH, 'S');
+    const color = k.c === 'good' ? PDF_C.good : (k.c === 'critical' ? PDF_C.critical : (k.c === 'accent' ? PDF_C.accent : PDF_C.ink));
+    pdf.setTextColor(...color); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10);
+    pdf.text(String(k.v), x + 2, y + 6);
+    pdf.setTextColor(...PDF_C.ink3); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(4.6);
+    pdf.text(pdfTruncate(pdf, k.l.toUpperCase(), tileW - 3.5), x + 2, y + 9.6);
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...PDF_C.ink2); pdf.setFontSize(4.6);
+    pdf.text(pdfTruncate(pdf, k.sub || '', tileW - 3.5), x + 2, y + 12.6);
   });
-  document.body.classList.remove('print-scope-own', 'print-scope-rival');
+  return y + tileH + 5;
 }
-window.addEventListener('afterprint', resetPrintZoom);
+// Fila genérica "nombre — barra — texto a la derecha", usada por sistemas más
+// usados, acierto por sistema, finalizadoras, generadoras y rebote ofensivo.
+// fillSegments: [{frac (0-1 del ancho de la barra), color}], dibujados uno
+// detrás de otro sobre un fondo gris (track).
+function pdfBarRow(pdf, x, y, w, name, fillSegments, rightText, trackColor){
+  const nameW = 30, gap = 1.6, rightW = 17;
+  const barX = x + nameW + gap, barW = Math.max(4, w - nameW - gap - rightW - gap);
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6); pdf.setTextColor(...PDF_C.ink);
+  pdf.text(pdfTruncate(pdf, name, nameW), x + nameW, y + 2.4, { align: 'right' });
+  pdf.setFillColor(...(trackColor || PDF_C.line)); pdf.rect(barX, y + 0.5, barW, 1.7, 'F');
+  let bx = barX;
+  (fillSegments || []).forEach(seg => {
+    const segW = Math.max(0, barW * seg.frac);
+    if (segW > 0.05) { pdf.setFillColor(...seg.color); pdf.rect(bx, y + 0.5, segW, 1.7, 'F'); }
+    bx += segW;
+  });
+  pdf.setTextColor(...PDF_C.ink2); pdf.setFontSize(6);
+  pdf.text(pdfTruncate(pdf, rightText, rightW), barX + barW + gap, y + 2.4);
+}
+// Reparte "items" en 2 columnas (mitad arriba a la izquierda, mitad a la
+// derecha), como hacía makePrintColumns en la vista de impresión.
+function pdfTwoColList(pdf, y, title, note, items, rowH, drawFn){
+  if (!items.length) return pdfSectionTitle(pdf, y, title, note);
+  const half = Math.ceil(items.length / 2);
+  const col1 = items.slice(0, half), col2 = items.slice(half);
+  const colW = (PDF_CW - 8) / 2;
+  const rows = Math.max(col1.length, col2.length);
+  // Se calcula el alto total (título + nota + filas) de antemano y se
+  // reserva de golpe: así, si no cabe entero en lo que queda de página, todo
+  // el bloque salta junto a la siguiente en vez de partirse a media lista.
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6);
+  const noteLines = note ? pdf.splitTextToSize(note, PDF_CW).length : 0;
+  const estTitleH = 4.8 + (note ? noteLines * 2.8 + 1.8 : 0);
+  const totalH = estTitleH + rows * rowH;
+  y = pdfEnsure(pdf, y, Math.min(totalH, PDF_H - 2 * PDF_M));
+  y = pdfSectionTitle(pdf, y, title, note);
+  const startY = y;
+  col1.forEach((it, i) => drawFn(pdf, PDF_M, startY + i * rowH, colW, it));
+  col2.forEach((it, i) => drawFn(pdf, PDF_M + colW + 8, startY + i * rowH, colW, it));
+  return startY + rows * rowH + 4.5;
+}
+// Lista simple "nombre — número" (sin barra), usada en pérdidas/faltas.
+function pdfSimpleList(pdf, x, y, w, title, items){
+  pdf.setTextColor(...PDF_C.ink3); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.6);
+  pdf.text(title.toUpperCase(), x, y);
+  let yy = y + 3;
+  if (!items.length) {
+    pdf.setTextColor(...PDF_C.ink3); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6);
+    pdf.text('—', x, yy + 2);
+    return yy + 3.5;
+  }
+  items.forEach(d => {
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6); pdf.setTextColor(...PDF_C.ink);
+    pdf.text(pdfTruncate(pdf, d.name, w - 8), x, yy + 2.2);
+    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...PDF_C.ink);
+    pdf.text(String(d.n), x + w - 2, yy + 2.2, { align: 'right' });
+    pdf.setDrawColor(...PDF_C.line); pdf.setLineWidth(0.1); pdf.line(x, yy + 3, x + w, yy + 3);
+    yy += 3.8;
+  });
+  return yy;
+}
+function pdfPairsTable(pdf, y, pairs, countLabel){
+  y = pdfSectionTitle(pdf, y, 'Parejas destacadas', `${countLabel} — combinaciones generadora -> finalizadora que más se repiten (mínimo 2 veces juntas), y en qué sistemas se han dado.`);
+  if (!pairs.length) return y;
+  const COLS = [['gen', 'GENERADORA', 46], ['arrow', '', 6], ['fin', 'FINALIZADORA', 46], ['n', 'VECES', 15], ['shot', 'TIRO', 18], ['exito', 'ÉXITO', 15], ['sys', 'SISTEMAS', PDF_CW - (46 + 6 + 46 + 15 + 18 + 15)]];
+  const rowH = 4.4, headH = 5;
+  function drawHead(yy){
+    pdf.setFillColor(...PDF_C.subtotalBg); pdf.rect(PDF_M, yy, PDF_CW, headH, 'F');
+    pdf.setTextColor(...PDF_C.ink3); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.6);
+    let x = PDF_M;
+    COLS.forEach(([, label, w]) => { if (label) pdf.text(label, x + 2, yy + 3.4); x += w; });
+    return yy + headH;
+  }
+  y = pdfEnsure(pdf, y, headH + rowH);
+  y = drawHead(y);
+  pairs.forEach(p => {
+    if (y + rowH > PDF_H - PDF_M) { pdf.addPage(); y = PDF_M; y = drawHead(y); }
+    let x = PDF_M;
+    const shotTxt = p.attempts ? `${p.made}/${p.attempts}` : 'sin tiro';
+    const sysTxt = p.systems.map(([sys, n]) => sys + (n > 1 ? ` ×${n}` : '')).join('  ·  ');
+    const vals = [p.gen, '->', p.fin, `×${p.n}`, shotTxt, `${p.exito}/${p.n}`, sysTxt];
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6);
+    vals.forEach((v, i) => {
+      const w = COLS[i][2];
+      pdf.setTextColor(...(i === 5 && p.exito > 0 ? PDF_C.good : (i === 3 ? PDF_C.accent : PDF_C.ink)));
+      pdf.setFont('helvetica', (i === 0 || i === 2 || i === 3) ? 'bold' : 'normal');
+      pdf.text(pdfTruncate(pdf, v, w - 3), x + 2, y + 3, { align: i === 1 ? 'center' : 'left' });
+      x += w;
+    });
+    pdf.setDrawColor(...PDF_C.line); pdf.setLineWidth(0.1); pdf.line(PDF_M, y + rowH, PDF_M + PDF_CW, y + rowH);
+    y += rowH;
+  });
+  return y + 4.5;
+}
+function pdfOerTable(pdf, y, blocks){
+  const COLS = [
+    ['cat', 'FASE', 40], ['label', 'SISTEMA', 58],
+    ['total', 'TOTAL', 13], ['pts', 'PTS', 11], ['oer', 'OER', 13],
+    ['fgm2', '2PM', 10], ['fga2', '2PA', 10], ['fgm3', '3PM', 10], ['fga3', '3PA', 10],
+    ['ftm', 'TLM', 10], ['fta', 'TLA', 10], ['pf', 'PF', 9], ['to', 'TO', 9],
+    ['exito', 'ÉXITO', 14], ['pctexito', '%ÉXITO', PDF_CW - (40+58+13+11+13+10+10+10+10+10+10+9+9+14)]
+  ];
+  const rowH = 4.4, headH = 5.6;
+  function drawHead(yy){
+    pdf.setFillColor(...PDF_C.ink); pdf.rect(PDF_M, yy, PDF_CW, headH, 'F');
+    pdf.setTextColor(...PDF_C.white); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.8);
+    let x = PDF_M;
+    COLS.forEach(([k, label, w]) => {
+      pdf.text(label, k === 'cat' || k === 'label' ? x + 2 : x + w / 2, yy + 3.7, { align: (k === 'cat' || k === 'label') ? 'left' : 'center' });
+      x += w;
+    });
+    return yy + headH;
+  }
+  y = pdfEnsure(pdf, y, headH + rowH * 2);
+  y = drawHead(y);
+  function cellVal(k, r){
+    switch (k) {
+      case 'label': return r.label;
+      case 'total': return String(r.total);
+      case 'pts': return String(r.pts);
+      case 'oer': return r.oer.toFixed(2);
+      case 'fgm2': return String(r.fgm2); case 'fga2': return String(r.fga2);
+      case 'fgm3': return String(r.fgm3); case 'fga3': return String(r.fga3);
+      case 'ftm': return String(r.ftm); case 'fta': return String(r.fta);
+      case 'pf': return String(r.pf); case 'to': return String(r.to);
+      case 'exito': return `${r.exito}/${r.total}`;
+      case 'pctexito': return `${r.pct_exito.toFixed(1)}%`;
+      default: return '';
+    }
+  }
+  blocks.forEach(block => {
+    const [bg, ink] = PDF_C.cat[block.cat] || [PDF_C.line, PDF_C.ink];
+    let catLabelPending = true; // se escribe en la 1ª fila visible del bloque en cada página
+    const allRows = [...block.rows.map(r => ({ r, isSubtotal: false })), { r: block.subtotal, isSubtotal: true, label: `Subtotal ${block.cat}` }];
+    allRows.forEach(({ r, isSubtotal, label }) => {
+      if (y + rowH > PDF_H - PDF_M) { pdf.addPage(); y = PDF_M; y = drawHead(y); catLabelPending = true; }
+      let x = PDF_M;
+      if (isSubtotal) pdf.setFillColor(...PDF_C.subtotalBg); else pdf.setFillColor(255, 255, 255);
+      pdf.rect(PDF_M + COLS[0][2], y, PDF_CW - COLS[0][2], rowH, 'F');
+      pdf.setFillColor(...bg); pdf.rect(PDF_M, y, COLS[0][2], rowH, 'F');
+      if (catLabelPending) {
+        pdf.setTextColor(...ink); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(6);
+        pdf.text(pdfTruncate(pdf, block.cat, COLS[0][2] - 3), PDF_M + 2, y + 3, { align: 'left' });
+        catLabelPending = false;
+      }
+      x = PDF_M + COLS[0][2];
+      COLS.slice(1).forEach(([k, , w]) => {
+        const isLabelCol = k === 'label';
+        const val = isSubtotal ? (isLabelCol ? label : (['total', 'pts', 'oer', 'exito', 'pctexito'].includes(k) ? cellVal(k, r) : '')) : cellVal(k, r);
+        let color = PDF_C.ink;
+        if (k === 'oer' && val !== '') { const oerV = isSubtotal ? r.oer : r.oer; color = oerV >= 1 ? PDF_C.good : (oerV < 0.6 ? PDF_C.critical : PDF_C.ink); }
+        pdf.setTextColor(...color);
+        pdf.setFont('helvetica', isSubtotal ? 'bold' : 'normal'); pdf.setFontSize(6);
+        pdf.text(pdfTruncate(pdf, val, w - (isLabelCol ? 3 : 2)), isLabelCol ? x + 2 : x + w / 2, y + 3, { align: isLabelCol ? 'left' : 'center' });
+        x += w;
+      });
+      pdf.setDrawColor(...PDF_C.line); pdf.setLineWidth(0.1); pdf.line(PDF_M, y + rowH, PDF_M + PDF_CW, y + rowH);
+      y += rowH;
+    });
+  });
+  return y + 3;
+}
+function pdfFooterNote(pdf, y, text){
+  y = pdfEnsure(pdf, y, 10);
+  pdf.setDrawColor(...PDF_C.line); pdf.setLineWidth(0.15); pdf.line(PDF_M, y, PDF_M + PDF_CW, y);
+  y += 3;
+  pdf.setTextColor(...PDF_C.ink2); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(5.6);
+  const lines = pdf.splitTextToSize(text, PDF_CW);
+  lines.forEach(line => { y = pdfEnsure(pdf, y, 3); pdf.text(line, PDF_M, y); y += 2.7; });
+  return y;
+}
+
+// Construye y descarga el PDF de UNA sola parte (propia o rival) a partir de
+// currentReport (guardado al final de buildReport()). Cada parte es un
+// archivo independiente — de ahí las dos descargas separadas.
+function exportPdf(scope){
+  if (!currentReport) return;
+  if (!(window.jspdf && window.jspdf.jsPDF)) {
+    alert('No se ha podido cargar el generador de PDF (jsPDF) — puede que falle la conexión a internet. Inténtalo de nuevo en unos segundos.');
+    return;
+  }
+  const r = currentReport;
+  const isOwn = scope === 'own';
+  const plays = isOwn ? r.plays : r.rivalPlays;
+  const oppOffRebCount = isOwn ? r.rivalRebCount : r.ownRebCount;
+  const title = isOwn ? r.title : `Análisis ofensivo — ${r.rivalLabel || 'Rival'}`;
+  const oppSuffix = isOwn ? ' del rival' : ' nuestro';
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  const kpi = computeKPIs(plays, oppOffRebCount);
+  let y = pdfBigHeader(pdf, title, r.subtitle);
+  y = pdfKpiRow(pdf, kpi, y, oppSuffix);
+
+  const sysEntries = systemUsage(plays);
+  const maxSys = sysEntries.length ? sysEntries[0][1] : 1;
+  y = pdfTwoColList(pdf, y, 'Sistemas ofensivos más usados', `${sysEntries.length} sistemas · ${plays.length} jugadas — frecuencia de cada set o acción ofensiva registrada.`,
+    sysEntries.map(([name, n]) => ({ name, n })), 4.2,
+    (pdf, x, y, w, d) => pdfBarRow(pdf, x, y, w, d.name, [{ frac: d.n / maxSys, color: PDF_C.accent }], String(d.n)));
+
+  const shotSys = shotAccuracyBySystem(plays, 1);
+  y = pdfTwoColList(pdf, y, 'Acierto de tiro por sistema', `${shotSys.length} sistemas con algún tiro registrado. Verde = anotado, gris = fallado.`,
+    shotSys, 4.2,
+    (pdf, x, y, w, d) => pdfBarRow(pdf, x, y, w, d.sys, [{ frac: d.pct, color: PDF_C.good }], `${Math.round(d.pct * 100)}% ${d.made}/${d.att}`, PDF_C.miss));
+
+  const finEntries = finalizadoras(plays);
+  y = pdfTwoColList(pdf, y, 'Finalizadoras', `${finEntries.length} jugadoras — tiros por jugadora que termina la jugada, separando T2 y T3.`,
+    finEntries, 4.2,
+    (pdf, x, y, w, d) => pdfBarRow(pdf, x, y, w, d.name, [
+      { frac: d.t2m / d.att, color: PDF_C.accent }, { frac: d.t3m / d.att, color: PDF_C.three },
+      { frac: (d.t2a - d.t2m) / d.att, color: PDF_C.accentWash }, { frac: (d.t3a - d.t3m) / d.att, color: PDF_C.threeWash }
+    ], `${Math.round(d.pct * 100)}% ${d.made}/${d.att}`));
+
+  const genEntries = generadoras(plays);
+  const maxGen = Math.max(1, ...genEntries.map(d => d.n));
+  y = pdfTwoColList(pdf, y, 'Generadoras', 'Nº de jugadas en las que la jugadora inicia o crea la acción («GEN»); en color de acento, cuántas acabaron en canasta.',
+    genEntries, 4.2,
+    (pdf, x, y, w, d) => pdfBarRow(pdf, x, y, w, d.name, [{ frac: d.made / d.n, color: PDF_C.accent }], `${d.made}/${d.n}`));
+
+  const pairs = pairRelations(plays);
+  const featuredAll = pairs.filter(p => p.n >= 2);
+  const featured = featuredAll.slice(0, 10);
+  y = pdfPairsTable(pdf, y, featured, `Top ${featured.length} de ${featuredAll.length} combinaciones con 2+ jugadas juntas`);
+
+  // Rebote ofensivo / pérdidas / faltas — 3 columnas
+  y = pdfSectionTitle(pdf, y, 'Rebote ofensivo, pérdidas y faltas provocadas', 'Rebotes ofensivos capturados; quién pierde el balón y quién finaliza cuando el rival comete falta.');
+  {
+    const colW = (PDF_CW - 16) / 3;
+    const rebEntries = reboteOfensivo(plays);
+    const maxReb = Math.max(1, ...rebEntries.map(d => d.n));
+    const rebRows = Math.max(1, rebEntries.length);
+    const toByP = turnoversByPlayer(plays), toByS = turnoversBySystem(plays);
+    const flByP = foulsByPlayer(plays), flByS = foulsBySystem(plays);
+    const estRows = Math.max(rebRows, toByP.length, toByS.length, flByP.length, flByS.length, 1);
+    y = pdfEnsure(pdf, y, 6 + estRows * 4.2);
+    const startY = y;
+    pdf.setTextColor(...PDF_C.accent); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(6);
+    pdf.text('REBOTE OFENSIVO', PDF_M, startY);
+    rebEntries.forEach((d, i) => pdfBarRow(pdf, PDF_M, startY + 3 + i * 4.2, colW, d.name, [{ frac: d.n / maxReb, color: PDF_C.line }, { frac: (d.made / d.n) * (d.n / maxReb), color: PDF_C.accent }], `${d.made}/${d.n}`));
+    if (!rebEntries.length) { pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...PDF_C.ink3); pdf.setFontSize(6); pdf.text('—', PDF_M, startY + 5); }
+
+    const x2 = PDF_M + colW + 8;
+    pdf.setTextColor(...PDF_C.critical); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(6);
+    pdf.text('PÉRDIDAS', x2, startY);
+    const yA = pdfSimpleList(pdf, x2, startY + 3.5, colW / 2 - 2, 'Por jugadora', toByP);
+    const yB = pdfSimpleList(pdf, x2 + colW / 2 + 2, startY + 3.5, colW / 2 - 2, 'Por sistema', toByS);
+
+    const x3 = PDF_M + (colW + 8) * 2;
+    pdf.setTextColor(...PDF_C.good); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(6);
+    pdf.text('FALTAS PROVOCADAS', x3, startY);
+    const yC = pdfSimpleList(pdf, x3, startY + 3.5, colW / 2 - 2, 'Por jugadora', flByP);
+    const yD = pdfSimpleList(pdf, x3 + colW / 2 + 2, startY + 3.5, colW / 2 - 2, 'Por sistema', flByS);
+
+    const usedH = Math.max(rebRows * 4.2 + 3, yA - startY, yB - startY, yC - startY, yD - startY, 20);
+    y = startY + usedH + 4;
+  }
+
+  y = pdfFooterNote(pdf, y, `Cómo leer este informe: ${plays.length} jugadas ofensivas analizadas · ${kpi.rivalOffReb} rebotes ofensivos del oponente en estas jugadas. «Generadora» (GEN) es quien crea o inicia la jugada, «Finalizadora» (FIN) quien tira, y «Rebote» (REB) quien captura el rebote ofensivo. Posesiones = tiros de campo intentados + pérdidas + 0,44×tiros libres intentados - rebotes ofensivos propios (${kpi.fga} + ${kpi.turnovers} + 0,44×${kpi.fta} - ${kpi.ownOffReb} = ${kpi.possessions.toFixed(1)}); OER = puntos / posesiones.`);
+
+  // ==== Tabla por sistema (página aparte) ====
+  pdf.addPage();
+  y = pdfBigHeader(pdf, title, r.subtitle);
+  y = pdfSectionTitle(pdf, y, 'Eficiencia ofensiva por sistema', 'OER = puntos / posesión, agrupado por fase de ataque.');
+  y = pdfOerTable(pdf, y, categoryTable(plays));
+  y = pdfFooterNote(pdf, y, 'OER = puntos anotados en ese sistema / número de veces que se jugó, redondeado a 2 decimales. 2PM/2PA, 3PM/3PA: tiros de campo anotados/intentados. TLM/TLA: tiros libres, por viaje a la línea. PF: faltas recibidas de la defensa contraria en esa jugada. TO: pérdidas de balón. Éxito: la jugada termina en canasta o el rival comete falta.');
+
+  const safeName = (isOwn ? 'Propio' : (r.rivalLabel || 'Rival')).replace(/[^\w\-]+/g, '_');
+  pdf.save(`Rendimiento_${safeName}.pdf`);
+}
 
 /* ============================================================
    Arranque
