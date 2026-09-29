@@ -1933,10 +1933,39 @@ function extractPrintCss(){
 // Elementos que no deben partirse a media altura entre dos páginas del PDF.
 const PDF_SAFE_SEL = '.rank-row, .stack-row, .li, .card, .kpi, .pairs-table tr, ' +
   '#viewTable tbody tr, #viewTableRival tbody tr, .page-footer, ' +
-  'section > h2, .section-note, .legend-inline, ' +
   'section:has(.pairs-table), section:has(.small-list)';
 // Elementos que SIEMPRE empiezan página nueva (mismo criterio que @media print).
 const PDF_FORCED_SEL = '#viewTable, #viewDashboardRival, #viewTableRival';
+
+// El título de una sección (h2 + nota/leyenda) nunca debe quedar solo al
+// final de una página, con su contenido (la gráfica/lista/tabla) empezando
+// recién en la siguiente — eso es justo lo que pasaba con "Finalizadoras" y
+// "Generadoras". Para evitarlo, el título se protege JUNTO a la primera fila
+// de su contenido (no la sección entera, que puede ser larga) como un único
+// bloque que no se puede partir.
+function pdfHeadingGroups(clonedEl, rootTop){
+  const groups = [];
+  clonedEl.querySelectorAll('section').forEach(sec => {
+    const h2 = sec.querySelector(':scope > h2');
+    if (!h2) return;
+    const children = [...sec.children];
+    let contentEl = null;
+    for (let i = children.indexOf(h2) + 1; i < children.length; i++){
+      const c = children[i];
+      if (c.classList.contains('section-note') || c.classList.contains('legend-inline')) continue;
+      contentEl = c; break;
+    }
+    const h2r = h2.getBoundingClientRect();
+    let top = h2r.top - rootTop, bottom = h2r.bottom - rootTop;
+    if (contentEl) {
+      const firstRow = contentEl.querySelector('.rank-row, .stack-row, .li, tr, .kpi') || contentEl;
+      const fr = firstRow.getBoundingClientRect();
+      bottom = Math.max(bottom, fr.bottom - rootTop);
+    }
+    groups.push({ top, bottom });
+  });
+  return groups;
+}
 
 // Construye y descarga el PDF de UNA sola parte (propia o rival) fotografiando
 // el informe ya maquetado (#pageReport, con su layout de impresión activado
@@ -1976,6 +2005,7 @@ async function exportPdf(scope){
           const r = el.getBoundingClientRect();
           return { top: r.top - rootTop, bottom: r.bottom - rootTop };
         });
+        breakpoints.push(...pdfHeadingGroups(clonedEl, rootTop));
         forcedBreaksBefore = [...clonedEl.querySelectorAll(PDF_FORCED_SEL)]
           .filter(el => getComputedStyle(el).display !== 'none')
           .map(el => el.getBoundingClientRect().top - rootTop)
