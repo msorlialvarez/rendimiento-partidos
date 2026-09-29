@@ -157,6 +157,7 @@
   }
   .tab-btn.active{ background:var(--ink); color:#fff; }
   .tab-btn.hidden{ display:none; }
+  .pdf-btn.hidden{ display:none; }
   .tab-btn.rival-tab{ background:var(--accent-wash); color:var(--accent); }
   .tab-btn.rival-tab.active{ background:var(--accent); color:#fff; }
   .pdf-btn{
@@ -166,6 +167,9 @@
   }
   .pdf-btn:hover{ background:var(--accent); }
   .pdf-btn svg{ width:14px; height:14px; flex:none; }
+  .pdf-btn + .pdf-btn{ margin-inline-start:8px; }
+  .pdf-btn.rival-tab{ background:var(--accent); }
+  .pdf-btn.rival-tab:hover{ background:var(--ink); }
   .back-btn{ background:none; border:none; color:var(--ink-2); font-family:Karla,sans-serif; font-size:12.5px; font-weight:700; cursor:pointer; padding:0; margin-block-end:14px; display:inline-flex; align-items:center; gap:5px; }
   .back-btn:hover{ color:var(--accent); }
 
@@ -269,6 +273,11 @@
     .view{ display:block !important; }
     .view.no-rival{ display:none !important; }
     #viewTable, #viewDashboardRival, #viewTableRival{ break-before: page; }
+    /* El PDF se exporta en dos tandas separadas (propia / rival): al imprimir
+       solo una de las dos, se oculta por completo el bloque del otro equipo
+       para que salga como fichero aparte en vez de dentro del mismo PDF. */
+    body.print-scope-own #viewDashboardRival, body.print-scope-own #viewTableRival{ display:none !important; }
+    body.print-scope-rival #viewDashboard, body.print-scope-rival #viewTable{ display:none !important; }
 
     .report-head{ padding-block-end:8px; margin-block-end:12px; border-bottom-width:2px; }
     .report-eyebrow{ font-size:9.5px; margin-block-end:3px; }
@@ -343,7 +352,9 @@
 
     .table-title{ font-size:16px; margin-block-end:3px; padding-inline-start:9px; border-inline-start:3px solid var(--accent); }
     .legend-note{ font-size:9.5px; margin-block-end:6px; display:block; max-width:none; }
-    #viewTable thead th, #viewTableRival thead th{ position:static; padding:4.5px 8px; font-size:9.5px; }
+    #viewTable thead th, #viewTableRival thead th{ position:static !important; padding:4.5px 8px; font-size:9.5px; }
+    #viewTable thead th.catcol, #viewTableRival thead th.catcol{ position:static !important; }
+    #viewTable tbody td.catcell, #viewTableRival tbody td.catcell{ position:static !important; }
     #viewTable tbody td, #viewTableRival tbody td{ padding:2.6px 8px; font-size:10.5px; }
     #viewTable tbody td.label, #viewTableRival tbody td.label{ font-size:11px; }
     #viewTable tbody tr.subtotal td, #viewTableRival tbody tr.subtotal td{ padding:2.6px 8px; }
@@ -490,9 +501,13 @@
         <button class="tab-btn rival-tab" data-target="viewDashboardRival" id="tabRivalDash" type="button">Rival: Resumen</button>
         <button class="tab-btn rival-tab" data-target="viewTableRival" id="tabRivalTable" type="button">Rival: Tabla</button>
       </div><br>
-      <button class="pdf-btn" onclick="exportPdf()" type="button">
+      <button class="pdf-btn" onclick="exportPdf('own')" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-        Exportar a PDF
+        PDF propio
+      </button>
+      <button class="pdf-btn rival-tab" id="btnPdfRival" onclick="exportPdf('rival')" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        PDF rival
       </button>
     </div>
   </div>
@@ -968,13 +983,25 @@ function computeKPIs(plays, rivalOffReb) {
   const ownOffReb = plays.filter(p => p.system && /REBOTE OFEN|REB OFF/.test(p.system)).length;
   const turnovers = plays.filter(p => p.turnover).length;
   const foulsDrawn = plays.filter(p => p.foul).length;
+  // Posesiones (fórmula estándar de baloncesto):
+  // Posesiones = Tiros de campo intentados + Pérdidas + 0.44×Tiros libres intentados − Rebotes ofensivos
+  // El 0.44 aproxima cuántos "viajes a la línea" generan una posesión nueva
+  // (evita contar de más los viajes de 2/3 tiros libres, que son la misma
+  // posesión). Se resta el rebote ofensivo propio porque prolonga la misma
+  // posesión en vez de generar una nueva.
+  const fga = plays.reduce((s, p) => s + (p.fga || 0), 0);
+  const fta = plays.reduce((s, p) => s + (p.fta || 0), 0);
+  const pts = plays.reduce((s, p) => s + (p.pts || 0), 0);
+  const possessions = Math.max(0, fga + turnovers + 0.44 * fta - ownOffReb);
+  const oer = possessions > 0 ? pts / possessions : 0;
   return {
     totalShots: shots.length, totalMade: made.length,
     pctGlobal: shots.length ? made.length / shots.length : 0,
     t2a: t2.length, t2m, pctT2: t2.length ? t2m / t2.length : 0,
     t3a: t3.length, t3m, pctT3: t3.length ? t3m / t3.length : 0,
     ownOffReb, rivalOffReb, turnovers, foulsDrawn,
-    totalPlays: plays.length
+    totalPlays: plays.length,
+    fga, fta, pts, possessions, oer
   };
 }
 
@@ -1602,6 +1629,8 @@ const oerClass = (oer) => oer >= 1.0 ? 'oer-good' : (oer < 0.6 ? 'oer-bad' : '')
 function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
   const kpi = computeKPIs(plays, oppOffRebCount);
   const kpis = [
+    {v: kpi.pts, l:'Puntos', sub: `${kpi.possessions.toFixed(1)} posesiones`, cls:'accent'},
+    {v: kpi.oer.toFixed(2), l:'OER', sub:'puntos / posesión', cls: kpi.oer >= 1.0 ? 'good' : (kpi.oer < 0.6 ? 'critical' : 'accent')},
     {v: kpi.totalShots, l:'Tiros totales', sub: `${kpi.totalMade} anotados`, cls:'accent'},
     {v: Math.round(kpi.pctGlobal*100)+'%', l:'% acierto global', sub:`${kpi.totalMade}/${kpi.totalShots}`, cls:'good'},
     {v: Math.round(kpi.pctT2*100)+'%', l:'% acierto T2', sub:`${kpi.t2m}/${kpi.t2a}`},
@@ -1726,7 +1755,7 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
   const foulSysList = document.getElementById(ids.foulSysList); foulSysList.innerHTML = '';
   foulsBySystem(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; foulSysList.appendChild(li); });
 
-  document.getElementById(ids.dashFooter).innerHTML = opts.footerHtml || `<b>Cómo leer este informe:</b> ${plays.length} jugadas ofensivas analizadas · ${kpi.rivalOffReb} rebotes ofensivos del oponente en estas jugadas. «Generadora» (GEN) es quien crea o inicia la jugada, «Finalizadora» (FIN) quien tira, y «Rebote» (REB) quien captura el rebote ofensivo, según el descriptor de jugadoras de Nacsport. T2/T3 y el resultado (C = convertido, F = fallado) proceden de los descriptores de la categoría.`;
+  document.getElementById(ids.dashFooter).innerHTML = opts.footerHtml || `<b>Cómo leer este informe:</b> ${plays.length} jugadas ofensivas analizadas · ${kpi.rivalOffReb} rebotes ofensivos del oponente en estas jugadas. «Generadora» (GEN) es quien crea o inicia la jugada, «Finalizadora» (FIN) quien tira, y «Rebote» (REB) quien captura el rebote ofensivo, según el descriptor de jugadoras de Nacsport. T2/T3 y el resultado (C = convertido, F = fallado) proceden de los descriptores de la categoría. <b>Posesiones</b> = tiros de campo intentados + pérdidas + 0,44×tiros libres intentados − rebotes ofensivos propios (${kpi.fga} + ${kpi.turnovers} + 0,44×${kpi.fta} − ${kpi.ownOffReb} = ${kpi.possessions.toFixed(1)}); <b>OER</b> = puntos / posesiones.`;
 
   // tabla OER
   const table = opts.fakeTable || categoryTable(plays);
@@ -1794,6 +1823,7 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLab
   // acumulado) tiene jugadas rivales identificadas
   document.getElementById('tabRivalDash').classList.toggle('hidden', !hasRival);
   document.getElementById('tabRivalTable').classList.toggle('hidden', !hasRival);
+  document.getElementById('btnPdfRival').classList.toggle('hidden', !hasRival);
   document.getElementById('viewDashboardRival').classList.toggle('no-rival', !hasRival);
   document.getElementById('viewTableRival').classList.toggle('no-rival', !hasRival);
 
@@ -1849,7 +1879,7 @@ function fitPrintBlock(id, maxPages){
   // (break-inside: avoid, en parejas / rebote-pérdidas-faltas): cuando una de
   // esas no cabe entera en lo que queda de página salta completa a la
   // siguiente, y ese hueco no lo refleja la altura total medida aquí.
-  const budget = PRINT_PAGE_HEIGHT_PX * maxPages * 0.8;
+  const budget = PRINT_PAGE_HEIGHT_PX * maxPages * 0.72;
   const h = el.getBoundingClientRect().height;
   if (h > budget) {
     el.style.zoom = Math.max(0.35, budget / h);
@@ -1860,11 +1890,18 @@ function fitPrintBlock(id, maxPages){
 // dispararse, y depender de él es frágil). El zoom se deshace al volver de
 // imprimir (evento "afterprint", con un timeout de respaldo por si el
 // navegador no lo dispara).
-function exportPdf(){
+// Descarga separada: "own" imprime solo el bloque propio (resumen + tabla,
+// máx. 3 páginas), "rival" solo el bloque del rival (otras máx. 3 páginas) —
+// así salen dos PDF distintos en vez de uno combinado de 6 páginas. El
+// ajuste de zoom se calcula igual en los dos casos, mida lo que mida el otro
+// bloque, porque queda oculto por completo (ver body.print-scope-*).
+function exportPdf(scope){
   fitPrintBlock('viewDashboard', 2);
   fitPrintBlock('viewTable', 1);
   fitPrintBlock('viewDashboardRival', 2);
   fitPrintBlock('viewTableRival', 1);
+  document.body.classList.toggle('print-scope-own', scope === 'own');
+  document.body.classList.toggle('print-scope-rival', scope === 'rival');
   window.print();
 }
 function resetPrintZoom(){
@@ -1872,6 +1909,7 @@ function resetPrintZoom(){
     const el = document.getElementById(id);
     if (el) el.style.zoom = '';
   });
+  document.body.classList.remove('print-scope-own', 'print-scope-rival');
 }
 window.addEventListener('afterprint', resetPrintZoom);
 
