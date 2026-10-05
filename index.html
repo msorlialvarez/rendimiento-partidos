@@ -899,24 +899,49 @@ function buildPlays(instances) {
     if (isRivalOreb) rivalOffReb++; // se sigue contando el contador histórico, pero AHORA también se procesa como jugada normal
 
     // Divide las etiquetas en segmentos por equipo (ver comentario de arriba).
+    //
+    // OJO: algunas instancias traen, ANTES de la primera etiqueta de
+    // jugadora (GEN_/FIN_/REB_ con su group), una etiqueta descriptiva sin
+    // group propio (p.ej. "1er ATQ 1C" o, en jugadas que arrancan con el
+    // resultado, "T3"/"F"). Esas etiquetas sueltas no tienen equipo propio:
+    // describen la jugada entera, sea propia o rival. Antes, al no haber
+    // ningún segmento todavía creado ("!current"), se les asignaba el equipo
+    // "own" por defecto — así se generaba un segmento fantasma con team:
+    // 'own' y gen/fin/reb vacíos, que luego se contaba igualmente como una
+    // jugada propia más en "Sistemas ofensivos más usados" (aunque sin tiro
+    // ni resultado, no se nota en los KPIs, pero sí ensucia el recuento de
+    // sistemas) — por eso un sistema 100% rival como "Horns" o "Horns (como
+    // banda)" aparecía también en el lado propio. Ahora esas etiquetas
+    // "huérfanas" se guardan aparte (pending) y se enganchan al PRIMER
+    // segmento real que aparezca (el que trae group), sea propio o rival,
+    // en vez de crear un segmento propio de la nada.
     const segments = [];
     let current = null;
+    let pending = [];
     for (const lab of inst.labels) {
       const m = /^(GEN|FIN|REB)_(.+)$/.exec(lab.text);
       if (m && (lab.group === 'JUGADORAS' || lab.group === 'RIVALES')) {
         const team = lab.group === 'RIVALES' ? 'rival' : 'own';
         if (!current || current.team !== team) {
           current = { team, gen: null, fin: null, reb: null, texts: [] };
+          if (pending.length) { current.texts.push(...pending); pending = []; }
           segments.push(current);
         }
         const code2 = m[2].toUpperCase();
         if (m[1] === 'GEN') current.gen = code2;
         else if (m[1] === 'FIN') current.fin = code2;
         else if (m[1] === 'REB') current.reb = code2;
-      } else {
-        if (!current) { current = { team: 'own', gen: null, fin: null, reb: null, texts: [] }; segments.push(current); }
+      } else if (current) {
         current.texts.push(lab.text);
+      } else {
+        pending.push(lab.text);
       }
+    }
+    // Instancia sin NINGUNA jugadora etiquetada (ni propia ni rival): se
+    // asume propia, por compatibilidad con partidos antiguos sin plantilla
+    // de jugadoras (ver DEFAULT_OWN_ROSTER más abajo).
+    if (!segments.length && pending.length) {
+      segments.push({ team: 'own', gen: null, fin: null, reb: null, texts: pending });
     }
     if (!segments.length) continue; // instancia sin ninguna etiqueta útil (no debería pasar tras los excludes de arriba)
 
