@@ -463,15 +463,22 @@
 <!-- ======================= PÁGINA: CONFIGURACIÓN ======================= -->
 <div id="pageConfig" class="page">
   <section>
-    <h2>Fases de ataque por sistema <span class="badge-warn" id="cfgSysWarn" style="display:none;"></span></h2>
-    <p class="section-note">Nacsport no distingue fastbreak / transición / sets / salidas de banda o fondo en el nombre del sistema — esta app hace una asignación automática razonable y avisa de los sistemas nuevos que no reconoce, pero conviene revisarla con el cuerpo técnico. Los cambios se aplican también a los partidos ya guardados.</p>
+    <h2>Fases de ataque por sistema — Propio <span class="badge-warn" id="cfgSysWarn" style="display:none;"></span></h2>
+    <p class="section-note">Nacsport no distingue fastbreak / transición / sets / salidas de banda o fondo en el nombre del sistema — esta app hace una asignación automática razonable y avisa de los sistemas nuevos que no reconoce, pero conviene revisarla con el cuerpo técnico. Es un único listado, válido para todos los partidos (nuestro propio playbook es siempre el mismo). Los cambios se aplican también a los partidos ya guardados. Si por un corte de vídeo se ha colado un «sistema» que en realidad no lo es, puedes quitarlo con el botón de la derecha — sus jugadas dejan de contar en los informes.</p>
     <div class="card" style="padding:0; overflow-x:auto;">
       <table class="simple cfg-table" id="cfgSysTable">
-        <thead><tr><th>Sistema</th><th>Fase</th><th></th></tr></thead>
+        <thead><tr><th>Sistema</th><th>Fase</th><th></th><th></th></tr></thead>
         <tbody id="cfgSysBody"></tbody>
       </table>
-      <div class="empty-note" id="cfgSysEmpty" style="display:none;">Todavía no hay sistemas registrados — sube un partido primero.</div>
+      <div class="empty-note" id="cfgSysEmpty" style="display:none;">Todavía no hay sistemas propios registrados — sube un partido primero.</div>
     </div>
+  </section>
+
+  <section>
+    <h2>Fases de ataque por sistema — Rival <span class="badge-warn" id="cfgSysWarnRival" style="display:none;"></span></h2>
+    <p class="section-note">El rival se configura <b>partido a partido</b>: el mismo nombre de sistema puede significar una jugada distinta según el equipo contrario, así que aquí cada partido tiene su propia asignación de fases (no se comparte entre partidos, ni siquiera frente al mismo rival). Igual que en propio, puedes quitar un sistema que se haya colado por error en ESE partido.</p>
+    <div id="cfgSysRivalGroups"></div>
+    <div class="empty-note" id="cfgSysRivalEmpty" style="display:none;">Todavía no hay sistemas del rival registrados — sube un partido con seguimiento del rival primero.</div>
   </section>
 
   <section>
@@ -484,15 +491,22 @@
   </section>
 
   <section>
-    <h2>Nombres de jugadoras</h2>
-    <p class="section-note">Nacsport identifica a cada jugadora por un código corto (p. ej. «ARAUJO», «KB»). Ponle aquí el nombre que quieres que se muestre en los informes; se aplica a todos los partidos, incluidos los ya guardados.</p>
+    <h2>Nombres de jugadoras — Propio</h2>
+    <p class="section-note">Nacsport identifica a cada jugadora por un código corto (p. ej. «ARAUJO», «KB»). Ponle aquí el nombre que quieres que se muestre en los informes. Es un único listado, válido para todos los partidos (nuestra propia plantilla es siempre la misma); se aplica también a los partidos ya guardados.</p>
     <div class="card" style="padding:0; overflow-x:auto;">
       <table class="simple cfg-table" id="cfgPlayerTable">
         <thead><tr><th>Código</th><th>Nombre a mostrar</th></tr></thead>
         <tbody id="cfgPlayerBody"></tbody>
       </table>
-      <div class="empty-note" id="cfgPlayerEmpty" style="display:none;">Todavía no hay jugadoras registradas — sube un partido primero.</div>
+      <div class="empty-note" id="cfgPlayerEmpty" style="display:none;">Todavía no hay jugadoras propias registradas — sube un partido primero.</div>
     </div>
+  </section>
+
+  <section>
+    <h2>Nombres de jugadoras — Rival</h2>
+    <p class="section-note">El rival se configura <b>partido a partido</b>: el mismo código puede identificar a jugadoras distintas según el equipo contrario, así que aquí cada partido tiene su propia lista (no se comparte entre partidos, ni siquiera frente al mismo rival).</p>
+    <div id="cfgPlayerRivalGroups"></div>
+    <div class="empty-note" id="cfgPlayerRivalEmpty" style="display:none;">Todavía no hay jugadoras del rival registradas — sube un partido con seguimiento del rival primero.</div>
     <div style="margin-block-start:14px;"><button class="btn secondary" id="btnGuardarCfg" type="button">Guardar cambios</button></div>
   </section>
 </div>
@@ -949,10 +963,13 @@ function buildPlays(instances) {
       const hasTag = t => seg.texts.includes(t);
 
       const isAndOne = hasTag('2+1');
-      // "2+1" describe por sí misma el resultado (canasta anotada + 1 tiro libre
-      // adicional), así que manda sobre cualquier C/F que la acompañe: en el
-      // export algunas jugadas de 2+1 llevan una 'F' residual que no indica un
-      // tiro fallado en este caso.
+      // "2+1" describe por sí misma el tiro de campo (siempre anotado — de
+      // ahí el "+1" del tiro libre adicional por la falta), así que el
+      // tiro de campo manda sobre cualquier C/F que lo acompañe. PERO esa
+      // "F" sí tiene sentido en el tiro libre extra: "2+1 F" es justo como
+      // Nacsport marca que el tiro de campo entró (2+1) y el tiro libre
+      // adicional se falló (F) — antes se ignoraba por completo y el "+1"
+      // se contaba siempre como anotado, pase lo que pase.
       let shotType = hasTag('T3') ? 3 : (hasTag('T2') ? 2 : null);
       let made = shotType ? (hasTag('C') ? true : (hasTag('F') ? false : null)) : null;
       if (isAndOne) { shotType = shotType || 2; made = true; }
@@ -965,7 +982,7 @@ function buildPlays(instances) {
       if (hasTag('1TLF')) { fta += 1; }
       if (hasTag('2TLC')) { ftm += 2; fta += 2; }
       if (hasTag('2TLF')) { fta += 2; }
-      if (isAndOne) { ftm += 1; fta += 1; }
+      if (isAndOne) { fta += 1; if (!hasTag('F')) ftm += 1; }
 
       const fgm = (shotType && made) ? 1 : 0;
       const fga = shotType ? 1 : 0;
@@ -987,15 +1004,16 @@ function buildPlays(instances) {
   return { plays, rivalOffReb, defensivePossessions };
 }
 
-/* ---------- Resolución de nombres (aplicable en cualquier momento con el alias vigente) ---------- */
-function resolvePlayNames(plays, aliasMap) {
-  const cache = {};
-  const res = (code) => {
-    if (code === null) return null;
-    if (!(code in cache)) cache[code] = resolvePlayerName(code, aliasMap);
-    return cache[code];
-  };
-  return plays.map(p => ({ ...p, gen: res(p.gen), fin: res(p.fin), reb: res(p.reb) }));
+/* ---------- Resolución de nombres (aplicable en cualquier momento con el alias vigente) ----------
+   mapOrFn puede ser un mapa plano {codigo: nombre} (propio, siempre el mismo)
+   o una función (play) => mapa (rival: cada jugada puede venir de un partido
+   distinto y cada partido tiene su propio mapa de alias de rival). */
+function resolvePlayNames(plays, mapOrFn) {
+  return plays.map(p => {
+    const map = (typeof mapOrFn === 'function') ? (mapOrFn(p) || {}) : (mapOrFn || {});
+    const res = (code) => (code === null ? null : resolvePlayerName(code, map));
+    return { ...p, gen: res(p.gen), fin: res(p.fin), reb: res(p.reb) };
+  });
 }
 
 function collectUnknownPlayers(plays, aliasMap) {
@@ -1004,20 +1022,40 @@ function collectUnknownPlayers(plays, aliasMap) {
   return [...seen].filter(c => !(aliasMap && aliasMap[c])).sort();
 }
 
-/* ---------- Categorización (aplicable a un conjunto ya combinado de jugadas) ---------- */
-function applyCategoryMap(plays, categoryMap) {
-  return plays.map(p => ({ ...p, category: categoryMap[p.system] || guessCategory(p.system) || 'SETS' }));
+/* ---------- Categorización (aplicable a un conjunto ya combinado de jugadas) ----------
+   mapOrFn puede ser un mapa plano {sistema: fase} (propio, siempre el
+   mismo) o una función (play) => mapa (rival: cada jugada puede venir de un
+   partido distinto, con su propio mapa — ver _matchId en buildReport). */
+function applyCategoryMap(plays, mapOrFn) {
+  return plays.map(p => {
+    const map = (typeof mapOrFn === 'function') ? (mapOrFn(p) || {}) : (mapOrFn || {});
+    return { ...p, category: map[p.system] || guessCategory(p.system) || 'SETS' };
+  });
 }
 
+// Sistemas sin fase reconocible, separados por equipo: el propio se compara
+// contra categoryMap.own (un único mapa válido en todos los partidos); el
+// del rival SIEMPRE se trata como "nuevo" aquí (se llama con el partido aún
+// sin guardar — sin id todavía — así que no puede haber ya una asignación
+// por partido para él), salvo que el nombre ya encaje con la detección
+// automática por patrón (guessCategory).
 function collectUnknownSystems(plays, categoryMap) {
-  const seen = new Set();
-  const unknown = [];
+  const seenOwn = new Set(), seenRival = new Set();
+  const unknownOwn = [], unknownRival = [];
+  const ownMap = (categoryMap && categoryMap.own) || {};
   for (const p of plays) {
-    if (seen.has(p.system)) continue;
-    seen.add(p.system);
-    if (!categoryMap[p.system] && !guessCategory(p.system)) unknown.push(p.system);
+    const isOwn = p.team !== 'rival';
+    if (isOwn) {
+      if (seenOwn.has(p.system)) continue;
+      seenOwn.add(p.system);
+      if (!ownMap[p.system] && !guessCategory(p.system)) unknownOwn.push(p.system);
+    } else {
+      if (seenRival.has(p.system)) continue;
+      seenRival.add(p.system);
+      if (!guessCategory(p.system)) unknownRival.push(p.system);
+    }
   }
-  return unknown;
+  return { own: unknownOwn, rival: unknownRival };
 }
 
 /* ---------- Agregados ---------- */
@@ -1245,19 +1283,69 @@ const STORE_KEY = 'vbScoutingMatches';
 const CATMAP_KEY = 'vbScoutingCategoryMap';
 const ALIAS_KEY = 'vbScoutingPlayerAliases';
 const OWNROSTER_KEY = 'vbScoutingOwnRoster';
+const EXCLSYS_KEY = 'vbScoutingExcludedSystems';
 
 function loadMatches(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch(e){ return []; } }
 function saveMatches(list){ localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
-function loadCategoryMap(){ try { return JSON.parse(localStorage.getItem(CATMAP_KEY)) || {...DEFAULT_CATEGORY_MAP}; } catch(e){ return {...DEFAULT_CATEGORY_MAP}; } }
+// El mapa de fases distingue PROPIO (un único mapa, válido para todos los
+// partidos: es nuestro propio playbook, siempre el mismo) de RIVAL (un mapa
+// por partido: el mismo nombre de sistema puede significar una jugada
+// distinta según el equipo contrario, así que cada partido tiene su propia
+// asignación). Formato: { own: {sistema: fase}, rival: {matchId: {sistema: fase}} }.
+//
+// migrateCategoryMap() admite también el formato antiguo (de antes de esta
+// distinción): un mapa plano {sistema: fase} compartido entre propio y
+// rival — se reinterpreta como el mapa "own" de siempre, y el rival empieza
+// sin asignaciones propias (cae en la detección automática por nombre).
+function migrateCategoryMap(raw){
+  if (!raw || typeof raw !== 'object') return { own: {...DEFAULT_CATEGORY_MAP}, rival: {} };
+  if (raw.own || raw.rival) return { own: raw.own || {...DEFAULT_CATEGORY_MAP}, rival: raw.rival || {} };
+  return { own: raw, rival: {} }; // formato antiguo (mapa plano)
+}
+function loadCategoryMap(){ try { return migrateCategoryMap(JSON.parse(localStorage.getItem(CATMAP_KEY))); } catch(e){ return { own: {...DEFAULT_CATEGORY_MAP}, rival: {} }; } }
 function saveCategoryMap(map){ localStorage.setItem(CATMAP_KEY, JSON.stringify(map)); }
-function loadAliasMap(){ try { return JSON.parse(localStorage.getItem(ALIAS_KEY)) || {}; } catch(e){ return {}; } }
+// Igual distinción que categoryMap: el alias de nuestras propias jugadoras es
+// un único mapa válido para todos los partidos, pero el alias de jugadoras
+// rivales se guarda por partido (el mismo código corto puede identificar a
+// jugadoras distintas según el rival, e incluso cambiar entre partidos contra
+// el mismo rival). Formato: { own: {codigo: nombre}, rival: {matchId: {codigo: nombre}} }.
+// migrateAliasMap() admite el formato antiguo (mapa plano, de antes de esta
+// distinción): se reinterpreta como el mapa "own", y el rival empieza vacío.
+function migrateAliasMap(raw){
+  if (!raw || typeof raw !== 'object') return { own: {}, rival: {} };
+  if (raw.own || raw.rival) return { own: raw.own || {}, rival: raw.rival || {} };
+  return { own: raw, rival: {} }; // formato antiguo (mapa plano)
+}
+function loadAliasMap(){ try { return migrateAliasMap(JSON.parse(localStorage.getItem(ALIAS_KEY))); } catch(e){ return { own: {}, rival: {} }; } }
 function saveAliasMap(map){ localStorage.setItem(ALIAS_KEY, JSON.stringify(map)); }
 function loadOwnRoster(){ try { return JSON.parse(localStorage.getItem(OWNROSTER_KEY)) || [...DEFAULT_OWN_ROSTER]; } catch(e){ return [...DEFAULT_OWN_ROSTER]; } }
 function saveOwnRoster(list){ localStorage.setItem(OWNROSTER_KEY, JSON.stringify(list)); }
+// Sistemas descartados a mano desde Configuración: por los cortes de vídeo,
+// de vez en cuando Nacsport detecta como "sistema" algo que en realidad no
+// lo es (una etiqueta suelta, un corte a mitad de jugada...). Igual
+// distinción propio/rival que categoryMap y aliasMap: el propio es un único
+// listado (nuestro playbook es siempre el mismo), el rival se descarta
+// partido a partido. Formato: { own: [sistema, ...], rival: { matchId: [sistema, ...] } }.
+// Un sistema descartado desaparece de los listados de Configuración Y de
+// las jugadas que entran en los informes (no tiene sentido mantenerlo en
+// las estadísticas si no era un sistema real).
+function loadExcludedSystems(){ try { const raw = JSON.parse(localStorage.getItem(EXCLSYS_KEY)); return (raw && typeof raw === 'object') ? { own: raw.own || [], rival: raw.rival || {} } : { own: [], rival: {} }; } catch(e){ return { own: [], rival: {} }; } }
+function saveExcludedSystems(map){ localStorage.setItem(EXCLSYS_KEY, JSON.stringify(map)); }
+// matchId explícito (contexto de un único partido) o, si se omite, se lee de
+// p._matchId en cada jugada (contexto agregado: "ver por rival" / "temporada
+// completa", donde las jugadas vienen mezcladas de varios partidos).
+function filterExcludedSystems(plays, excludedSystems, matchId) {
+  return plays.filter(p => {
+    if (p.team === 'own') return !(excludedSystems.own || []).includes(p.system);
+    const mid = matchId !== undefined ? matchId : p._matchId;
+    return !((excludedSystems.rival && excludedSystems.rival[mid]) || []).includes(p.system);
+  });
+}
 
 let matches = loadMatches();
 let categoryMap = loadCategoryMap();
 let aliasMap = loadAliasMap();
+let excludedSystems = loadExcludedSystems();
 let ownRoster = loadOwnRoster();
 // Datos del informe actualmente abierto, para poder generar el PDF (ver
 // exportPdf/buildPdfReport) sin depender de lo que haya en pantalla.
@@ -1314,11 +1402,12 @@ function renderMatchesPage(){
   const ownSetList = new Set(ownRoster.map(s => s.toUpperCase()));
   const sorted = [...matches].sort((a,b) => (b.date||'').localeCompare(a.date||''));
   for (const m of sorted) {
-    const ownRaw = m.plays.filter(p => classifyTeam(p, ownSetList) === 'own');
-    const rivalRaw = m.plays.filter(p => classifyTeam(p, ownSetList) === 'rival');
+    const cleanPlays = filterExcludedSystems(m.plays, excludedSystems, m.id);
+    const ownRaw = cleanPlays.filter(p => classifyTeam(p, ownSetList) === 'own');
+    const rivalRaw = cleanPlays.filter(p => classifyTeam(p, ownSetList) === 'rival');
     const hasRival = rivalRaw.length > 0;
-    const categorized = applyCategoryMap(resolvePlayNames(ownRaw, aliasMap), categoryMap);
-    const rivalCategorized = applyCategoryMap(resolvePlayNames(rivalRaw, aliasMap), categoryMap);
+    const categorized = applyCategoryMap(resolvePlayNames(ownRaw, aliasMap.own), categoryMap.own);
+    const rivalCategorized = applyCategoryMap(resolvePlayNames(rivalRaw, aliasMap.rival[m.id] || {}), categoryMap.rival[m.id] || {});
     const rivalRebCount = hasRival ? rivalCategorized.filter(p => p.reb).length : (m.rivalOffReb || 0);
     const kpi = computeKPIs(categorized, rivalRebCount);
     const tr = document.createElement('tr');
@@ -1383,20 +1472,29 @@ function deleteMatch(id){
   if (!m) return;
   matches = matches.filter(x => x.id !== id);
   saveMatches(matches);
+  // limpia también las fases, los alias y los sistemas descartados del rival guardados para este partido en concreto
+  if (categoryMap.rival[id]) { delete categoryMap.rival[id]; saveCategoryMap(categoryMap); }
+  if (aliasMap.rival[id]) { delete aliasMap.rival[id]; saveAliasMap(aliasMap); }
+  if (excludedSystems.rival[id]) { delete excludedSystems.rival[id]; saveExcludedSystems(excludedSystems); }
   renderMatchesPage();
 }
 
+// Las 3 funciones que arman rawPlays para buildReport etiquetan cada jugada
+// con _matchId: el rival se categoriza por partido (ver buildReport), así
+// que al combinar jugadas de varios partidos (por rival / temporada) hace
+// falta saber de qué partido viene cada una para aplicarle su mapa de fases.
 document.getElementById('btnVerRival').addEventListener('click', () => {
   const rival = document.getElementById('rivalSelect').value;
   if (!rival) return;
-  const plays = matches.filter(m => m.rival === rival).flatMap(m => m.plays);
-  const rivalOffReb = matches.filter(m => m.rival === rival).reduce((a,m) => a + m.rivalOffReb, 0);
-  const n = matches.filter(m => m.rival === rival).length;
+  const rivalMatches = matches.filter(m => m.rival === rival);
+  const plays = rivalMatches.flatMap(m => m.plays.map(p => ({ ...p, _matchId: m.id })));
+  const rivalOffReb = rivalMatches.reduce((a,m) => a + m.rivalOffReb, 0);
+  const n = rivalMatches.length;
   buildReport(plays, rivalOffReb, `Ataque vs. ${rival}`, `Acumulado de ${n} partido${n===1?'':'s'} frente a este rival.`, `${n} partido${n===1?'':'s'}`, rival);
 });
 
 document.getElementById('btnVerTotal').addEventListener('click', () => {
-  const plays = matches.flatMap(m => m.plays);
+  const plays = matches.flatMap(m => m.plays.map(p => ({ ...p, _matchId: m.id })));
   const rivalOffReb = matches.reduce((a,m) => a + m.rivalOffReb, 0);
   buildReport(plays, rivalOffReb, 'Ataque — Temporada completa', `Acumulado de los ${matches.length} partidos guardados.`, `${matches.length} partidos`, 'Rivales de la temporada');
 });
@@ -1404,7 +1502,8 @@ document.getElementById('btnVerTotal').addEventListener('click', () => {
 function viewMatch(id){
   const m = matches.find(x => x.id === id);
   if (!m) return;
-  buildReport(m.plays, m.rivalOffReb, `Ataque vs. ${m.rival}`, `${fmtDate(m.date)} · ${m.competition || 'Partido'}`, fmtDate(m.date), m.rival);
+  const plays = m.plays.map(p => ({ ...p, _matchId: m.id }));
+  buildReport(plays, m.rivalOffReb, `Ataque vs. ${m.rival}`, `${fmtDate(m.date)} · ${m.competition || 'Partido'}`, fmtDate(m.date), m.rival);
 }
 
 /* ============================================================
@@ -1446,8 +1545,28 @@ document.getElementById('importFile').addEventListener('change', (e) => {
       const incoming = payload.matches.filter(m => !existingIds.has(m.id));
       matches = [...matches, ...incoming];
       saveMatches(matches);
-      if (payload.categoryMap) { categoryMap = { ...categoryMap, ...payload.categoryMap }; saveCategoryMap(categoryMap); }
-      if (payload.aliasMap) { aliasMap = { ...aliasMap, ...payload.aliasMap }; saveAliasMap(aliasMap); }
+      if (payload.categoryMap) {
+        // fusión profunda: el "own" se combina campo a campo, y el "rival"
+        // partido a partido (no sustituir entero, para no perder ajustes
+        // locales de partidos que no vengan en esta copia de seguridad).
+        const incoming = migrateCategoryMap(payload.categoryMap);
+        const mergedRival = { ...categoryMap.rival };
+        for (const mid of Object.keys(incoming.rival)) {
+          mergedRival[mid] = { ...(categoryMap.rival[mid] || {}), ...incoming.rival[mid] };
+        }
+        categoryMap = { own: { ...categoryMap.own, ...incoming.own }, rival: mergedRival };
+        saveCategoryMap(categoryMap);
+      }
+      if (payload.aliasMap) {
+        // misma fusión profunda que categoryMap: "own" campo a campo, "rival" partido a partido.
+        const incomingAlias = migrateAliasMap(payload.aliasMap);
+        const mergedRivalAlias = { ...aliasMap.rival };
+        for (const mid of Object.keys(incomingAlias.rival)) {
+          mergedRivalAlias[mid] = { ...(aliasMap.rival[mid] || {}), ...incomingAlias.rival[mid] };
+        }
+        aliasMap = { own: { ...aliasMap.own, ...incomingAlias.own }, rival: mergedRivalAlias };
+        saveAliasMap(aliasMap);
+      }
       alert(`Importados ${incoming.length} partido(s) nuevo(s) (se han omitido los que ya existían).`);
       renderMatchesPage();
     } catch (err) {
@@ -1484,11 +1603,15 @@ function handleFile(file){
       const result = processMatchXML(xmlText, categoryMap);
       pendingParsed = { xmlFileName: file.name, ...result };
       let html = `<div class="banner ok">Leído correctamente: <b>${result.plays.length}</b> jugadas ofensivas, <b>${result.defensivePossessions}</b> posesiones defensivas, <b>${result.rivalOffReb}</b> rebotes ofensivos del rival.</div>`;
-      if (result.unknownSystems.length) {
-        html += `<div class="banner warn"><div><b>${result.unknownSystems.length} sistema(s) nuevo(s)</b> sin fase asignada — se guardarán como «SETS» por defecto. Puedes corregirlos luego en Configuración:<ul>${result.unknownSystems.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div></div>`;
+      const unkOwn = result.unknownSystems.own, unkRival = result.unknownSystems.rival;
+      if (unkOwn.length) {
+        html += `<div class="banner warn"><div><b>${unkOwn.length} sistema(s) propio(s) nuevo(s)</b> sin fase asignada — se guardarán como «SETS» por defecto. Puedes corregirlos luego en Configuración:<ul>${unkOwn.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div></div>`;
+      }
+      if (unkRival.length) {
+        html += `<div class="banner warn"><div><b>${unkRival.length} sistema(s) del rival nuevo(s)</b> sin fase asignada — se guardarán como «SETS» por defecto para ESTE partido (el rival se configura partido a partido). Puedes corregirlos luego en Configuración:<ul>${unkRival.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div></div>`;
       }
       const ownSet = new Set(ownRoster.map(s => s.toUpperCase()));
-      const unknownPlayers = collectUnknownPlayers(result.plays, aliasMap).filter(c => !ownSet.has(c));
+      const unknownPlayers = collectUnknownPlayers(result.plays, aliasMap.own).filter(c => !ownSet.has(c));
       if (unknownPlayers.length) {
         html += `<div class="banner warn"><div><b>${unknownPlayers.length} código(s) de jugadora nuevo(s)</b>, no reconocidos como plantilla propia — se contarán como rival en el informe. Si alguno es tuyo, añádelo en Configuración → «Plantilla propia»:<ul>${unknownPlayers.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div></div>`;
       }
@@ -1511,11 +1634,6 @@ document.getElementById('btnGuardar').addEventListener('click', () => {
   if (!rival) { alert('Indica el rival del partido.'); return; }
   if (!date) { alert('Indica la fecha del partido.'); return; }
 
-  // registrar sistemas nuevos en el mapa de categorías (por defecto SETS) para que queden listados en Configuración
-  let catChanged = false;
-  for (const s of pendingParsed.unknownSystems) { if (!categoryMap[s]) { categoryMap[s] = 'SETS'; catChanged = true; } }
-  if (catChanged) saveCategoryMap(categoryMap);
-
   const match = {
     id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     date, rival, competition,
@@ -1527,6 +1645,16 @@ document.getElementById('btnGuardar').addEventListener('click', () => {
   };
   matches.push(match);
   saveMatches(matches);
+
+  // registrar sistemas nuevos en el mapa de categorías (por defecto SETS) para que queden listados en Configuración:
+  // los propios en el mapa único "own", los del rival en el mapa de ESTE partido en concreto.
+  let catChanged = false;
+  for (const s of pendingParsed.unknownSystems.own) { if (!categoryMap.own[s]) { categoryMap.own[s] = 'SETS'; catChanged = true; } }
+  if (pendingParsed.unknownSystems.rival.length) {
+    categoryMap.rival[match.id] = categoryMap.rival[match.id] || {};
+    for (const s of pendingParsed.unknownSystems.rival) { categoryMap.rival[match.id][s] = 'SETS'; catChanged = true; }
+  }
+  if (catChanged) saveCategoryMap(categoryMap);
 
   // reset form
   pendingParsed = null;
@@ -1547,34 +1675,141 @@ document.getElementById('btnGuardar').addEventListener('click', () => {
 function renderConfigPage(){
   document.getElementById('ownRosterInput').value = ownRoster.join(', ');
 
-  const allSystems = [...new Set(matches.flatMap(m => m.plays.map(p => p.system)))].sort();
+  const ownSetList = new Set(ownRoster.map(s => s.toUpperCase()));
+
+  // --- Fases de ataque por sistema: Propio (un único listado) ---
+  // Un sistema ya descartado (excludedSystems.own) no se vuelve a listar: sus
+  // jugadas ya no cuentan, así que no tiene sentido seguir pidiendo que se le
+  // asigne una fase.
+  const ownSystems = [...new Set(
+    matches.flatMap(m => m.plays.filter(p => classifyTeam(p, ownSetList) === 'own').map(p => p.system))
+  )].filter(sys => !excludedSystems.own.includes(sys)).sort();
   const sysBody = document.getElementById('cfgSysBody');
   sysBody.innerHTML = '';
-  document.getElementById('cfgSysEmpty').style.display = allSystems.length ? 'none' : 'block';
-  let unknownCount = 0;
-  for (const sys of allSystems) {
-    const current = categoryMap[sys] || guessCategory(sys);
-    if (!categoryMap[sys]) unknownCount++;
+  document.getElementById('cfgSysEmpty').style.display = ownSystems.length ? 'none' : 'block';
+  let unknownOwnCount = 0;
+  for (const sys of ownSystems) {
+    const current = categoryMap.own[sys] || guessCategory(sys);
+    if (!categoryMap.own[sys]) unknownOwnCount++;
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${esc(sys)}</td>
       <td><select data-sys="${esc(sys)}">${CATEGORY_ORDER.map(c => `<option value="${c}" ${c===current?'selected':''}>${c}</option>`).join('')}</select></td>
-      <td>${categoryMap[sys] ? '' : '<span class="badge-warn">nuevo</span>'}</td>`;
+      <td>${categoryMap.own[sys] ? '' : '<span class="badge-warn">nuevo</span>'}</td>
+      <td><button class="del sys-remove" data-scope="own" data-sys="${esc(sys)}" type="button">Quitar</button></td>`;
     sysBody.appendChild(tr);
   }
   const warnEl = document.getElementById('cfgSysWarn');
-  warnEl.style.display = unknownCount ? 'inline-block' : 'none';
-  warnEl.textContent = unknownCount ? `${unknownCount} por revisar` : '';
+  warnEl.style.display = unknownOwnCount ? 'inline-block' : 'none';
+  warnEl.textContent = unknownOwnCount ? `${unknownOwnCount} por revisar` : '';
 
-  const allPlayers = [...new Set(matches.flatMap(m => m.plays.flatMap(p => [p.gen,p.fin,p.reb])))].filter(Boolean).sort();
+  // --- Fases de ataque por sistema: Rival (un listado por partido) ---
+  const rivalGroupsEl = document.getElementById('cfgSysRivalGroups');
+  rivalGroupsEl.innerHTML = '';
+  const sortedMatches = [...matches].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  let unknownRivalCount = 0;
+  let anyRivalMatch = false;
+  for (const m of sortedMatches) {
+    const excludedForMatch = excludedSystems.rival[m.id] || [];
+    const rivalSystems = [...new Set(m.plays.filter(p => classifyTeam(p, ownSetList) === 'rival').map(p => p.system))]
+      .filter(sys => !excludedForMatch.includes(sys)).sort();
+    if (!rivalSystems.length) continue;
+    anyRivalMatch = true;
+    const matchMap = categoryMap.rival[m.id] || {};
+    const rows = rivalSystems.map(sys => {
+      const current = matchMap[sys] || guessCategory(sys);
+      if (!matchMap[sys]) unknownRivalCount++;
+      return `<tr>
+        <td>${esc(sys)}</td>
+        <td><select data-match="${esc(m.id)}" data-sys="${esc(sys)}">${CATEGORY_ORDER.map(c => `<option value="${c}" ${c===current?'selected':''}>${c}</option>`).join('')}</select></td>
+        <td>${matchMap[sys] ? '' : '<span class="badge-warn">nuevo</span>'}</td>
+        <td><button class="del sys-remove" data-scope="rival" data-match="${esc(m.id)}" data-sys="${esc(sys)}" type="button">Quitar</button></td>
+      </tr>`;
+    }).join('');
+    const group = document.createElement('div');
+    group.className = 'card';
+    group.style.cssText = 'padding:0; overflow-x:auto; margin-block-end:14px;';
+    group.innerHTML = `<div style="padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;">
+        <span class="rival" style="font-weight:700;">${esc(m.rival)}</span>
+        <span class="pill">${esc(fmtDate(m.date))}${m.competition ? ' · ' + esc(m.competition) : ''}</span>
+      </div>
+      <table class="simple cfg-table">
+        <thead><tr><th>Sistema</th><th>Fase</th><th></th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    rivalGroupsEl.appendChild(group);
+  }
+  document.getElementById('cfgSysRivalEmpty').style.display = anyRivalMatch ? 'none' : 'block';
+  const warnRivalEl = document.getElementById('cfgSysWarnRival');
+  warnRivalEl.style.display = unknownRivalCount ? 'inline-block' : 'none';
+  warnRivalEl.textContent = unknownRivalCount ? `${unknownRivalCount} por revisar` : '';
+
+  // Botones "Quitar": descarta el sistema de inmediato (propio: global; rival:
+  // solo para ESE partido) y re-renderiza. Acción directa con confirmación,
+  // igual que "Eliminar" en la tabla de partidos — no hace falta pasar por
+  // "Guardar cambios".
+  document.querySelectorAll('#cfgSysBody button.sys-remove, #cfgSysRivalGroups button.sys-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sys = btn.dataset.sys;
+      if (btn.dataset.scope === 'own') {
+        if (!confirm(`¿Quitar el sistema «${sys}» del listado propio? Sus jugadas dejarán de contar en todos los informes.`)) return;
+        if (!excludedSystems.own.includes(sys)) excludedSystems.own.push(sys);
+      } else {
+        const mid = btn.dataset.match;
+        if (!confirm(`¿Quitar el sistema «${sys}» de este partido? Sus jugadas dejarán de contar en el informe de este partido.`)) return;
+        if (!excludedSystems.rival[mid]) excludedSystems.rival[mid] = [];
+        if (!excludedSystems.rival[mid].includes(sys)) excludedSystems.rival[mid].push(sys);
+      }
+      saveExcludedSystems(excludedSystems);
+      renderConfigPage();
+    });
+  });
+
+  // --- Nombres de jugadoras: Propio (un único listado) ---
+  const ownPlayers = [...new Set(
+    matches.flatMap(m => m.plays.filter(p => classifyTeam(p, ownSetList) === 'own').flatMap(p => [p.gen,p.fin,p.reb]))
+  )].filter(Boolean).sort();
   const plBody = document.getElementById('cfgPlayerBody');
   plBody.innerHTML = '';
-  document.getElementById('cfgPlayerEmpty').style.display = allPlayers.length ? 'none' : 'block';
-  for (const code of allPlayers) {
-    const current = aliasMap[code] || resolvePlayerName(code, {});
+  document.getElementById('cfgPlayerEmpty').style.display = ownPlayers.length ? 'none' : 'block';
+  for (const code of ownPlayers) {
+    const current = aliasMap.own[code] || resolvePlayerName(code, {});
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="mono">${esc(code)}</td><td><input type="text" data-player="${esc(code)}" value="${esc(current)}"></td>`;
     plBody.appendChild(tr);
   }
+
+  // --- Nombres de jugadoras: Rival (un listado por partido) ---
+  const plRivalGroupsEl = document.getElementById('cfgPlayerRivalGroups');
+  plRivalGroupsEl.innerHTML = '';
+  let anyRivalPlayerMatch = false;
+  for (const m of sortedMatches) {
+    const rivalPlayers = [...new Set(
+      m.plays.filter(p => classifyTeam(p, ownSetList) === 'rival').flatMap(p => [p.gen,p.fin,p.reb])
+    )].filter(Boolean).sort();
+    if (!rivalPlayers.length) continue;
+    anyRivalPlayerMatch = true;
+    const matchAliasMap = aliasMap.rival[m.id] || {};
+    const rows = rivalPlayers.map(code => {
+      const current = matchAliasMap[code] || resolvePlayerName(code, {});
+      return `<tr>
+        <td class="mono">${esc(code)}</td>
+        <td><input type="text" data-match="${esc(m.id)}" data-player="${esc(code)}" value="${esc(current)}"></td>
+      </tr>`;
+    }).join('');
+    const group = document.createElement('div');
+    group.className = 'card';
+    group.style.cssText = 'padding:0; overflow-x:auto; margin-block-end:14px;';
+    group.innerHTML = `<div style="padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;">
+        <span class="rival" style="font-weight:700;">${esc(m.rival)}</span>
+        <span class="pill">${esc(fmtDate(m.date))}${m.competition ? ' · ' + esc(m.competition) : ''}</span>
+      </div>
+      <table class="simple cfg-table">
+        <thead><tr><th>Código</th><th>Nombre a mostrar</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    plRivalGroupsEl.appendChild(group);
+  }
+  document.getElementById('cfgPlayerRivalEmpty').style.display = anyRivalPlayerMatch ? 'none' : 'block';
 }
 
 document.getElementById('btnGuardarRoster').addEventListener('click', () => {
@@ -1585,10 +1820,21 @@ document.getElementById('btnGuardarRoster').addEventListener('click', () => {
 });
 
 document.getElementById('btnGuardarCfg').addEventListener('click', () => {
-  document.querySelectorAll('#cfgSysBody select[data-sys]').forEach(sel => { categoryMap[sel.dataset.sys] = sel.value; });
+  document.querySelectorAll('#cfgSysBody select[data-sys]').forEach(sel => { categoryMap.own[sel.dataset.sys] = sel.value; });
+  document.querySelectorAll('#cfgSysRivalGroups select[data-sys]').forEach(sel => {
+    const mid = sel.dataset.match;
+    if (!categoryMap.rival[mid]) categoryMap.rival[mid] = {};
+    categoryMap.rival[mid][sel.dataset.sys] = sel.value;
+  });
   document.querySelectorAll('#cfgPlayerBody input[data-player]').forEach(inp => {
     const v = inp.value.trim();
-    if (v) aliasMap[inp.dataset.player] = v;
+    if (v) aliasMap.own[inp.dataset.player] = v;
+  });
+  document.querySelectorAll('#cfgPlayerRivalGroups input[data-player]').forEach(inp => {
+    const v = inp.value.trim();
+    const mid = inp.dataset.match;
+    if (!aliasMap.rival[mid]) aliasMap.rival[mid] = {};
+    if (v) aliasMap.rival[mid][inp.dataset.player] = v;
   });
   saveCategoryMap(categoryMap);
   saveAliasMap(aliasMap);
@@ -1857,12 +2103,22 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLab
   // (gen/fin/reb, antes de resolver alias), comparándolos con la plantilla
   // propia configurada en «Configuración». Ver comentario en classifyTeam().
   const ownSet = new Set(ownRoster.map(s => s.toUpperCase()));
-  const ownRaw = rawPlays.filter(p => classifyTeam(p, ownSet) === 'own');
-  const rivalRaw = rawPlays.filter(p => classifyTeam(p, ownSet) === 'rival');
+  // Fuera también las jugadas de un sistema descartado a mano en
+  // Configuración (ver filterExcludedSystems): rawPlays trae _matchId
+  // cuando viene de un acumulado (ver por rival / temporada), así se
+  // resuelve el descarte de rival partido a partido jugada a jugada.
+  const cleanPlays = filterExcludedSystems(rawPlays, excludedSystems);
+  const ownRaw = cleanPlays.filter(p => classifyTeam(p, ownSet) === 'own');
+  const rivalRaw = cleanPlays.filter(p => classifyTeam(p, ownSet) === 'rival');
   const hasRival = rivalRaw.length > 0;
 
-  const plays = applyCategoryMap(resolvePlayNames(ownRaw, aliasMap), categoryMap);
-  const rivalPlays = applyCategoryMap(resolvePlayNames(rivalRaw, aliasMap), categoryMap);
+  // El rival se categoriza por partido: rawPlays puede venir de VARIOS
+  // partidos a la vez (ver por rival / temporada completa), cada jugada
+  // trae su _matchId (añadido al construir rawPlays) y aquí se resuelve el
+  // mapa de fases que le corresponde a CADA jugada según de qué partido
+  // viene, en vez de usar un único mapa para todos.
+  const plays = applyCategoryMap(resolvePlayNames(ownRaw, aliasMap.own), categoryMap.own);
+  const rivalPlays = applyCategoryMap(resolvePlayNames(rivalRaw, p => aliasMap.rival[p._matchId] || {}), p => categoryMap.rival[p._matchId] || {});
 
   // Rebotes ofensivos del oponente en el bloque que se está mostrando: si hay
   // jugadas del rival identificadas por jugadora, se cuentan de esa forma
