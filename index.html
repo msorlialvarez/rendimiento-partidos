@@ -960,48 +960,102 @@ function buildPlays(instances) {
     if (!segments.length) continue; // instancia sin ninguna etiqueta útil (no debería pasar tras los excludes de arriba)
 
     for (const seg of segments) {
-      const hasTag = t => seg.texts.includes(t);
-
-      const isAndOne = hasTag('2+1');
-      // "2+1" describe por sí misma el tiro de campo (siempre anotado — de
-      // ahí el "+1" del tiro libre adicional por la falta), así que el
-      // tiro de campo manda sobre cualquier C/F que lo acompañe. PERO esa
-      // "F" sí tiene sentido en el tiro libre extra: "2+1 F" es justo como
-      // Nacsport marca que el tiro de campo entró (2+1) y el tiro libre
-      // adicional se falló (F) — antes se ignoraba por completo y el "+1"
-      // se contaba siempre como anotado, pase lo que pase.
-      let shotType = hasTag('T3') ? 3 : (hasTag('T2') ? 2 : null);
-      let made = shotType ? (hasTag('C') ? true : (hasTag('F') ? false : null)) : null;
-      if (isAndOne) { shotType = shotType || 2; made = true; }
-      const foul = hasTag('FALTA') || hasTag('FALTA TIRO');
-      const turnover = hasTag('PÉRDIDA');
-
-      // Tiros libres: lectura por viaje a la línea (Nacsport no separa tiro a tiro)
-      let ftm = 0, fta = 0;
-      if (hasTag('1TLC')) { ftm += 1; fta += 1; }
-      if (hasTag('1TLF')) { fta += 1; }
-      if (hasTag('2TLC')) { ftm += 2; fta += 2; }
-      if (hasTag('2TLF')) { fta += 2; }
-      if (isAndOne) { fta += 1; if (!hasTag('F')) ftm += 1; }
-
-      const fgm = (shotType && made) ? 1 : 0;
-      const fga = shotType ? 1 : 0;
-      const pts = (shotType && made ? shotType : 0) + ftm;
-      const exito = (shotType && made) || foul; // canasta anotada O falta recibida
-
       plays.push({
         id: inst.id, system: code, team: seg.team,
         category: null, // se resuelve luego con el mapa de categorías (puede variar entre partidos)
         gen: seg.gen, fin: seg.fin, reb: seg.reb,
-        shotType, made, fgm, fga,
-        ftm, fta, isAndOne,
-        foul, turnover,
-        pts, exito
+        texts: seg.texts.slice(), // etiquetas en bruto — permiten RECALCULAR
+        // las estadísticas derivadas de abajo si el motor cambia más adelante,
+        // sin tener que volver a subir el XML (ver deriveStats/refreshDerivedStats).
+        ...deriveStats(seg.texts)
       });
     }
   }
 
   return { plays, rivalOffReb, defensivePossessions };
+}
+
+/* Calcula a partir de las etiquetas en bruto de una jugada (texts) todas las
+   estadísticas derivadas (tiro, tiros libres, pérdida, falta...). Se separa de
+   buildPlays() a propósito: cada jugada guarda sus "texts" originales, así que
+   cuando esta función se corrige (nuevo caso de etiquetado detectado) basta con
+   volver a ejecutarla sobre los partidos YA guardados (refreshDerivedStats) para
+   que la corrección se aplique sola, sin tener que volver a subir cada XML. */
+function deriveStats(texts) {
+  const hasTag = t => texts.includes(t);
+  // Para los viajes a la línea SÍ hace falta contar cuántas veces aparece la
+  // etiqueta, no solo si está presente: Nacsport permite etiquetar dos viajes
+  // de tiros libres distintos dentro de la MISMA instancia (p.ej. una falta
+  // normal + una técnica/antideportiva seguidas, sin cortar la jugada), y
+  // entonces "2TLC" aparece DOS veces — cada aparición es un viaje de 2 tiros
+  // libres real, hay que sumarlas todas, no solo comprobar que existe al menos una.
+  const countTag = t => texts.reduce((n, x) => n + (x === t ? 1 : 0), 0);
+
+  const isAndOne = hasTag('2+1');
+  // "2+1" describe por sí misma el tiro de campo (siempre anotado — de ahí el
+  // "+1" del tiro libre adicional por la falta), así que el tiro de campo manda
+  // sobre cualquier C/F que lo acompañe. PERO esa "F" sí tiene sentido en el
+  // tiro libre extra: "2+1 F" es justo como Nacsport marca que el tiro de campo
+  // entró (2+1) y el tiro libre adicional se falló (F) — antes se ignoraba por
+  // completo y el "+1" se contaba siempre como anotado, pase lo que pase.
+  let shotType = hasTag('T3') ? 3 : (hasTag('T2') ? 2 : null);
+  let made = shotType ? (hasTag('C') ? true : (hasTag('F') ? false : null)) : null;
+  if (isAndOne) { shotType = shotType || 2; made = true; }
+  const foul = hasTag('FALTA') || hasTag('FALTA TIRO');
+  // "FALTA ATAQUE" (falta en ataque / cometida por el equipo con balón) es una
+  // pérdida de posesión igual que "PÉRDIDA": el equipo pierde el balón sin que
+  // haya tiro. Si no se cuenta aquí, esas jugadas no suman ni a tiros de campo
+  // ni a pérdidas y la posesión correspondiente "desaparece" del cálculo de
+  // posesiones (detectado al contrastar con el box score).
+  const turnover = hasTag('PÉRDIDA') || hasTag('FALTA ATAQUE');
+  // "TAPÓN" (tiro bloqueado) es un intento de tiro de campo fallado, pero
+  // Nacsport no siempre acompaña esa etiqueta de un T2/T3 (según el convenio de
+  // etiquetado de cada vídeo). Si no se ha detectado ya un tiro de campo por
+  // otra vía, se cuenta como un intento fallado de tipo desconocido para que no
+  // desaparezca de los intentos de tiro (fga) ni de las posesiones.
+  const blockedNoType = hasTag('TAPÓN') && !shotType && !isAndOne;
+  const fgaBlocked = blockedNoType ? 1 : 0;
+
+  // Tiros libres: lectura por viaje a la línea (Nacsport no separa tiro a
+  // tiro), contando cada aparición de la etiqueta (ver countTag arriba).
+  let ftm = 0, fta = 0;
+  const n1TLC = countTag('1TLC'), n1TLF = countTag('1TLF');
+  const n2TLC = countTag('2TLC'), n2TLF = countTag('2TLF');
+  ftm += n1TLC * 1; fta += n1TLC * 1;
+  fta += n1TLF * 1;
+  ftm += n2TLC * 2; fta += n2TLC * 2;
+  fta += n2TLF * 2;
+  if (isAndOne) { fta += 1; if (!hasTag('F')) ftm += 1; }
+
+  const fgm = (shotType && made) ? 1 : 0;
+  const fga = (shotType ? 1 : 0) + fgaBlocked;
+  const pts = (shotType && made ? shotType : 0) + ftm;
+  const exito = (shotType && made) || foul; // canasta anotada O falta recibida
+
+  return { shotType, made, fgm, fga, ftm, fta, isAndOne, foul, turnover, pts, exito };
+}
+
+/* Recorre los partidos guardados y, para cada jugada que tenga sus etiquetas en
+   bruto (texts) — es decir, guardada después de añadir este mecanismo —, vuelve
+   a calcular sus estadísticas derivadas con la lógica ACTUAL de deriveStats().
+   Así, cualquier corrección futura del motor se aplica sola a todo lo ya
+   guardado la próxima vez que se abra la app, sin tener que volver a subir los
+   XML. Las jugadas guardadas ANTES de este mecanismo no tienen "texts" y se
+   dejan tal cual (hace falta volver a subir ese partido una vez para que a
+   partir de ahí se beneficie también de las correcciones futuras). */
+function refreshDerivedStats(matchList) {
+  let changed = false;
+  for (const m of matchList) {
+    if (!Array.isArray(m.plays)) continue;
+    for (const p of m.plays) {
+      if (!Array.isArray(p.texts)) continue; // partido guardado antes de este mecanismo
+      const fresh = deriveStats(p.texts);
+      for (const k in fresh) {
+        if (p[k] !== fresh[k]) { p[k] = fresh[k]; changed = true; }
+      }
+    }
+  }
+  return changed;
 }
 
 /* ---------- Resolución de nombres (aplicable en cualquier momento con el alias vigente) ----------
@@ -1343,6 +1397,11 @@ function filterExcludedSystems(plays, excludedSystems, matchId) {
 }
 
 let matches = loadMatches();
+// Al cargar, recalcula las estadísticas derivadas de todas las jugadas que
+// guarden sus etiquetas en bruto (texts) con la lógica actual del motor — así
+// una corrección del motor se aplica sola a los partidos ya guardados sin
+// tener que volver a subir el XML (ver deriveStats/refreshDerivedStats arriba).
+if (refreshDerivedStats(matches)) saveMatches(matches);
 let categoryMap = loadCategoryMap();
 let aliasMap = loadAliasMap();
 let excludedSystems = loadExcludedSystems();
@@ -1544,6 +1603,7 @@ document.getElementById('importFile').addEventListener('change', (e) => {
       const existingIds = new Set(matches.map(m => m.id));
       const incoming = payload.matches.filter(m => !existingIds.has(m.id));
       matches = [...matches, ...incoming];
+      refreshDerivedStats(matches); // por si la copia viene de una versión anterior del motor
       saveMatches(matches);
       if (payload.categoryMap) {
         // fusión profunda: el "own" se combina campo a campo, y el "rival"
