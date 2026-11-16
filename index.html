@@ -1,3 +1,8 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rendimiento de Partidos VBC</title>
 <meta name="description" content="App para subir y guardar el export XML de Nacsport de cada partido, y ver el análisis de ataque por partido, por rival o de toda la temporada.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -157,6 +162,10 @@
   }
   .tab-btn.active{ background:var(--ink); color:#fff; }
   .tab-btn.hidden{ display:none; }
+  .mode-switch{ display:inline-flex; gap:0; margin-block-start:10px; border:1px solid var(--ink); border-radius:20px; overflow:hidden; }
+  .mode-switch.hidden{ display:none; }
+  .mode-btn{ font-family:Karla,sans-serif; font-size:12px; font-weight:700; letter-spacing:.02em; background:var(--surface); color:var(--ink); border:none; padding:7px 15px; cursor:pointer; }
+  .mode-btn.active{ background:var(--accent); color:#fff; }
   .pdf-btn.hidden{ display:none; }
   .tab-btn.rival-tab{ background:var(--accent-wash); color:var(--accent); }
   .tab-btn.rival-tab.active{ background:var(--accent); color:#fff; }
@@ -270,7 +279,7 @@
 
   @media print{
     @page{ size: A4 landscape; margin: 10mm 11mm; }
-    .pdf-btn, .tabs, #tt, header.top, .app-nav, .back-btn{ display:none !important; }
+    .pdf-btn, .tabs, .mode-switch, #tt, header.top, .app-nav, .back-btn{ display:none !important; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     body{ max-width:100%; padding:0; font-size:11px; }
     .page{ display:none !important; }
@@ -376,6 +385,10 @@
     #viewTable table, #viewTableRival table{ min-width:0; }
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+</head>
+<body>
+
 
 <div id="tt"></div>
 
@@ -397,7 +410,7 @@
 
   <section>
     <h2>Ver análisis agregado</h2>
-    <p class="section-note">Combina todos los partidos guardados frente a un mismo rival, o toda la temporada, en un único informe.</p>
+    <p class="section-note">Combina todos los partidos guardados frente a un mismo rival, o toda la temporada, en un único informe. En temporada completa puedes alternar entre totales y medias por partido.</p>
     <div class="card" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
       <select class="rival-select" id="rivalSelect"><option value="">Elige un rival…</option></select>
       <button class="btn secondary" id="btnVerRival" type="button">Ver por rival</button>
@@ -528,6 +541,10 @@
         <button class="tab-btn" data-target="viewTable" type="button">Tabla por sistema</button>
         <button class="tab-btn rival-tab" data-target="viewDashboardRival" id="tabRivalDash" type="button">Rival: Resumen</button>
         <button class="tab-btn rival-tab" data-target="viewTableRival" id="tabRivalTable" type="button">Rival: Tabla</button>
+      </div><br>
+      <div class="mode-switch hidden" id="seasonMode">
+        <button class="mode-btn active" data-mode="totals" type="button">Totales</button>
+        <button class="mode-btn" data-mode="avg" type="button">Medias por partido</button>
       </div><br>
       <button class="pdf-btn" id="btnPdfOwn" onclick="exportPdf('own')" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
@@ -1340,7 +1357,7 @@ const OWNROSTER_KEY = 'vbScoutingOwnRoster';
 const EXCLSYS_KEY = 'vbScoutingExcludedSystems';
 
 function loadMatches(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch(e){ return []; } }
-function saveMatches(list){ localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
+function saveMatches(list){ localStorage.setItem(STORE_KEY, JSON.stringify(list)); pushMatchesToDb(list); }
 // El mapa de fases distingue PROPIO (un único mapa, válido para todos los
 // partidos: es nuestro propio playbook, siempre el mismo) de RIVAL (un mapa
 // por partido: el mismo nombre de sistema puede significar una jugada
@@ -1357,7 +1374,7 @@ function migrateCategoryMap(raw){
   return { own: raw, rival: {} }; // formato antiguo (mapa plano)
 }
 function loadCategoryMap(){ try { return migrateCategoryMap(JSON.parse(localStorage.getItem(CATMAP_KEY))); } catch(e){ return { own: {...DEFAULT_CATEGORY_MAP}, rival: {} }; } }
-function saveCategoryMap(map){ localStorage.setItem(CATMAP_KEY, JSON.stringify(map)); }
+function saveCategoryMap(map){ localStorage.setItem(CATMAP_KEY, JSON.stringify(map)); pushConfigToDb(); }
 // Igual distinción que categoryMap: el alias de nuestras propias jugadoras es
 // un único mapa válido para todos los partidos, pero el alias de jugadoras
 // rivales se guarda por partido (el mismo código corto puede identificar a
@@ -1371,9 +1388,9 @@ function migrateAliasMap(raw){
   return { own: raw, rival: {} }; // formato antiguo (mapa plano)
 }
 function loadAliasMap(){ try { return migrateAliasMap(JSON.parse(localStorage.getItem(ALIAS_KEY))); } catch(e){ return { own: {}, rival: {} }; } }
-function saveAliasMap(map){ localStorage.setItem(ALIAS_KEY, JSON.stringify(map)); }
+function saveAliasMap(map){ localStorage.setItem(ALIAS_KEY, JSON.stringify(map)); pushConfigToDb(); }
 function loadOwnRoster(){ try { return JSON.parse(localStorage.getItem(OWNROSTER_KEY)) || [...DEFAULT_OWN_ROSTER]; } catch(e){ return [...DEFAULT_OWN_ROSTER]; } }
-function saveOwnRoster(list){ localStorage.setItem(OWNROSTER_KEY, JSON.stringify(list)); }
+function saveOwnRoster(list){ localStorage.setItem(OWNROSTER_KEY, JSON.stringify(list)); pushConfigToDb(); }
 // Sistemas descartados a mano desde Configuración: por los cortes de vídeo,
 // de vez en cuando Nacsport detecta como "sistema" algo que en realidad no
 // lo es (una etiqueta suelta, un corte a mitad de jugada...). Igual
@@ -1384,7 +1401,7 @@ function saveOwnRoster(list){ localStorage.setItem(OWNROSTER_KEY, JSON.stringify
 // las jugadas que entran en los informes (no tiene sentido mantenerlo en
 // las estadísticas si no era un sistema real).
 function loadExcludedSystems(){ try { const raw = JSON.parse(localStorage.getItem(EXCLSYS_KEY)); return (raw && typeof raw === 'object') ? { own: raw.own || [], rival: raw.rival || {} } : { own: [], rival: {} }; } catch(e){ return { own: [], rival: {} }; } }
-function saveExcludedSystems(map){ localStorage.setItem(EXCLSYS_KEY, JSON.stringify(map)); }
+function saveExcludedSystems(map){ localStorage.setItem(EXCLSYS_KEY, JSON.stringify(map)); pushConfigToDb(); }
 // matchId explícito (contexto de un único partido) o, si se omite, se lee de
 // p._matchId en cada jugada (contexto agregado: "ver por rival" / "temporada
 // completa", donde las jugadas vienen mezcladas de varios partidos).
@@ -1406,6 +1423,92 @@ let categoryMap = loadCategoryMap();
 let aliasMap = loadAliasMap();
 let excludedSystems = loadExcludedSystems();
 let ownRoster = loadOwnRoster();
+
+/* ============================================================
+   Sincronización en la nube (Supabase)
+   ------------------------------------------------------------
+   localStorage es la copia rápida con la que trabaja la app; Supabase
+   es la copia compartida en internet, que se mantiene en segundo
+   plano. Si no se han configurado SUPABASE_URL/SUPABASE_ANON_KEY, o
+   no hay conexión, la app sigue funcionando solo en local. */
+const SUPABASE_URL = 'https://hcwafeljnassfdfkirln.supabase.co'; // proyecto «Control Minutajes»
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhjd2FmZWxqbmFzc2ZkZmtpcmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxNTU0ODcsImV4cCI6MjEwNDczMTQ4N30.XBxtonttaDKrKBajO2-fI-VDMmMF8xMXUNuA3_eDOcA'; // clave pública (anon)
+
+let sb = null;
+const dbMatchesSnapshot = new Map(); // id -> JSON ya escrito en Supabase
+let dbConfigSnapshot = null;
+
+function pushMatchesToDb(list) {
+  if (!sb) return;
+  const currentIds = new Set(list.map(m => m.id));
+  for (const id of Array.from(dbMatchesSnapshot.keys())) {
+    if (!currentIds.has(id)) {
+      sb.from('rendimiento_matches').delete().eq('id', id).then(() => {});
+      dbMatchesSnapshot.delete(id);
+    }
+  }
+  for (const m of list) {
+    const json = JSON.stringify(m);
+    if (dbMatchesSnapshot.get(m.id) !== json) {
+      sb.from('rendimiento_matches').upsert({ id: m.id, data: m, updated_at: new Date().toISOString() })
+        .then(({ error }) => { if (!error) dbMatchesSnapshot.set(m.id, json); });
+    }
+  }
+}
+function pushConfigToDb() {
+  if (!sb) return;
+  const cfg = { categoryMap, aliasMap, excludedSystems, ownRoster };
+  const json = JSON.stringify(cfg);
+  if (dbConfigSnapshot === json) return;
+  sb.from('rendimiento_config').upsert({ id: 'settings', data: cfg, updated_at: new Date().toISOString() })
+    .then(({ error }) => { if (!error) dbConfigSnapshot = json; });
+}
+
+async function initDbSync() {
+  if (!window.supabase || !SUPABASE_URL || SUPABASE_URL.includes('TU-PROYECTO')) return;
+  try {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch (e) { sb = null; return; }
+
+  let localChanged = false;
+  try {
+    const { data: rows, error } = await sb.from('rendimiento_matches').select('id,data');
+    if (error) throw error;
+    const localIds = new Set(matches.map(m => m.id));
+    const remoteIds = new Set();
+    for (const row of (rows || [])) {
+      remoteIds.add(row.id);
+      const remote = row.data;
+      dbMatchesSnapshot.set(row.id, JSON.stringify(remote));
+      if (!localIds.has(row.id)) { matches.push(remote); localChanged = true; }
+    }
+    for (const m of matches) {
+      if (!remoteIds.has(m.id)) {
+        sb.from('rendimiento_matches').upsert({ id: m.id, data: m, updated_at: new Date().toISOString() })
+          .then(({ error }) => { if (!error) dbMatchesSnapshot.set(m.id, JSON.stringify(m)); });
+      }
+    }
+    if (localChanged) { refreshDerivedStats(matches); saveMatches(matches); }
+
+    const { data: cfgRow } = await sb.from('rendimiento_config').select('data').eq('id', 'settings').maybeSingle();
+    if (cfgRow && cfgRow.data) {
+      const remoteCfg = cfgRow.data || {};
+      if (remoteCfg.categoryMap) { categoryMap = migrateCategoryMap(remoteCfg.categoryMap); localStorage.setItem(CATMAP_KEY, JSON.stringify(categoryMap)); }
+      if (remoteCfg.aliasMap) { aliasMap = migrateAliasMap(remoteCfg.aliasMap); localStorage.setItem(ALIAS_KEY, JSON.stringify(aliasMap)); }
+      if (remoteCfg.excludedSystems) { excludedSystems = remoteCfg.excludedSystems; localStorage.setItem(EXCLSYS_KEY, JSON.stringify(excludedSystems)); }
+      if (Array.isArray(remoteCfg.ownRoster)) { ownRoster = remoteCfg.ownRoster; localStorage.setItem(OWNROSTER_KEY, JSON.stringify(ownRoster)); }
+      dbConfigSnapshot = JSON.stringify({ categoryMap, aliasMap, excludedSystems, ownRoster });
+      localChanged = true;
+    } else {
+      pushConfigToDb();
+    }
+  } catch (e) { /* fallo puntual de red: se sigue en local */ }
+
+  if (localChanged) {
+    const activeBtn = document.querySelector('#appNav button.active');
+    showPage(activeBtn ? activeBtn.dataset.page : 'pagePartidos');
+  }
+}
 // Datos del informe actualmente abierto, para poder generar el PDF (ver
 // exportPdf/buildPdfReport) sin depender de lo que haya en pantalla.
 let currentReport = null;
@@ -1555,7 +1658,22 @@ document.getElementById('btnVerRival').addEventListener('click', () => {
 document.getElementById('btnVerTotal').addEventListener('click', () => {
   const plays = matches.flatMap(m => m.plays.map(p => ({ ...p, _matchId: m.id })));
   const rivalOffReb = matches.reduce((a,m) => a + m.rivalOffReb, 0);
-  buildReport(plays, rivalOffReb, 'Ataque — Temporada completa', `Acumulado de los ${matches.length} partidos guardados.`, `${matches.length} partidos`, 'Rivales de la temporada');
+  buildReport(plays, rivalOffReb, 'Ataque — Temporada completa', `Acumulado de los ${matches.length} partidos guardados.`, `${matches.length} partidos`, 'Rivales de la temporada', { season: true, mode: 'totals' });
+});
+
+// Temporada completa: conmutador Totales / Medias por partido. Se vuelve a
+// construir el informe con los mismos datos en el modo elegido y se conserva
+// la pestaña (resumen / tabla) que estuviera abierta.
+document.querySelectorAll('#seasonMode .mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const r = currentReport;
+    if (!r || !r.season || r.mode === btn.dataset.mode) return;
+    const activeTab = document.querySelector('.tab-btn.active');
+    const target = activeTab ? activeTab.dataset.target : 'viewDashboard';
+    buildReport(r.rawPlays, r.rivalOffReb, r.title, r.subtitle, r.metaLabel, r.rivalLabel, { season: true, mode: btn.dataset.mode });
+    const tab = document.querySelector(`.tab-btn[data-target="${target}"]`);
+    if (tab && !tab.classList.contains('hidden')) tab.click();
+  });
 });
 
 function viewMatch(id){
@@ -1996,16 +2114,23 @@ const oerClass = (oer) => oer >= 1.0 ? 'oer-good' : (oer < 0.6 ? 'oer-bad' : '')
 // informe propio (ver comentario histórico más abajo).
 function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
   const kpi = computeKPIs(plays, oppOffRebCount);
+  // Modo "medias por partido" (solo temporada completa): cada recuento se
+  // divide entre el nº de partidos (opts.avgN) y se muestra con 1 decimal.
+  // Porcentajes y OER son cocientes y no cambian; las barras tampoco (son
+  // proporciones relativas dentro de la lista).
+  const N = opts.avgN || 0;
+  const f = (x) => N ? (x / N).toFixed(1) : x;
+  const per = N ? ' / partido' : '';
   const kpis = [
-    {v: kpi.pts, l:'Puntos', sub: `${kpi.possessions.toFixed(1)} posesiones`, cls:'accent'},
+    {v: f(kpi.pts), l:'Puntos' + per, sub: `${(N ? kpi.possessions / N : kpi.possessions).toFixed(1)} posesiones`, cls:'accent'},
     {v: kpi.oer.toFixed(2), l:'OER', sub:'puntos / posesión', cls: kpi.oer >= 1.0 ? 'good' : (kpi.oer < 0.6 ? 'critical' : 'accent')},
-    {v: kpi.totalShots, l:'Tiros totales', sub: `${kpi.totalMade} anotados`, cls:'accent'},
-    {v: Math.round(kpi.pctGlobal*100)+'%', l:'% acierto global', sub:`${kpi.totalMade}/${kpi.totalShots}`, cls:'good'},
-    {v: Math.round(kpi.pctT2*100)+'%', l:'% acierto T2', sub:`${kpi.t2m}/${kpi.t2a}`},
-    {v: Math.round(kpi.pctT3*100)+'%', l:'% acierto T3', sub:`${kpi.t3m}/${kpi.t3a}`},
-    {v: kpi.ownOffReb, l:'Rebotes ofens.', sub: `vs ${kpi.rivalOffReb}${opts.rebSubSuffix || ' del rival'}`},
-    {v: kpi.turnovers, l:'Pérdidas', sub:'balones perdidos', cls:'critical'},
-    {v: kpi.foulsDrawn, l:'Faltas provocadas', sub:'incl. tiro', cls:'good'},
+    {v: f(kpi.totalShots), l: N ? 'Tiros / partido' : 'Tiros totales', sub: `${f(kpi.totalMade)} anotados`, cls:'accent'},
+    {v: Math.round(kpi.pctGlobal*100)+'%', l:'% acierto global', sub:`${f(kpi.totalMade)}/${f(kpi.totalShots)}`, cls:'good'},
+    {v: Math.round(kpi.pctT2*100)+'%', l:'% acierto T2', sub:`${f(kpi.t2m)}/${f(kpi.t2a)}`},
+    {v: Math.round(kpi.pctT3*100)+'%', l:'% acierto T3', sub:`${f(kpi.t3m)}/${f(kpi.t3a)}`},
+    {v: f(kpi.ownOffReb), l:'Rebotes ofens.', sub: `vs ${f(kpi.rivalOffReb)}${opts.rebSubSuffix || ' del rival'}`},
+    {v: f(kpi.turnovers), l:'Pérdidas', sub:'balones perdidos', cls:'critical'},
+    {v: f(kpi.foulsDrawn), l:'Faltas provocadas', sub:'incl. tiro', cls:'good'},
   ];
   document.getElementById(ids.kpiStrip).innerHTML = kpis.map(k => `<div class="kpi ${k.cls||''}"><div class="val">${k.v}</div><div class="lbl">${k.l}</div><div class="sub">${k.sub}</div></div>`).join('');
 
@@ -2016,15 +2141,15 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
   // verificada), sin tocar el análisis real que ve la app en pantalla.
   const sysEntries = opts.fakeSys || systemUsage(plays);
   const sysPlaysCount = opts.fakeSys ? sysEntries.reduce((s, [, n]) => s + n, 0) : plays.length;
-  document.getElementById(ids.sysCount).textContent = `(${sysEntries.length} sistemas · ${sysPlaysCount} jugadas)`;
+  document.getElementById(ids.sysCount).textContent = `(${sysEntries.length} sistemas · ${f(sysPlaysCount)} jugadas${per})`;
   const maxSys = sysEntries.length ? sysEntries[0][1] : 1;
   const sysList = document.getElementById(ids.sysList); sysList.innerHTML = '';
   sysEntries.forEach(([name, n]) => {
     const w = Math.max(3, Math.round((n/maxSys)*100));
     const row = document.createElement('div'); row.className = 'rank-row';
-    row.innerHTML = `<div class="name">${esc(name)}</div><div class="track"><div class="fill" style="width:${w}%"></div></div><div class="n">${n}</div>`;
+    row.innerHTML = `<div class="name">${esc(name)}</div><div class="track"><div class="fill" style="width:${w}%"></div></div><div class="n">${f(n)}</div>`;
     sysList.appendChild(row);
-    bindTT(row.querySelector('.fill'), `${name}: ${n} jugadas`);
+    bindTT(row.querySelector('.fill'), `${name}: ${f(n)} jugadas${per}`);
   });
   fitNameColumn(sysList);
   makePrintColumns(sysList);
@@ -2036,10 +2161,10 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
   shotSys.forEach(d => {
     const madeW = Math.round(d.pct*100), missW = 100-madeW;
     const row = document.createElement('div'); row.className = 'stack-row';
-    row.innerHTML = `<div class="name">${esc(d.sys)}</div><div class="track"><div class="seg made" style="width:${madeW}%"></div><div class="seg missed" style="width:${missW}%"></div></div><div class="pct"><b>${madeW}%</b> ${d.made}/${d.att}</div>`;
+    row.innerHTML = `<div class="name">${esc(d.sys)}</div><div class="track"><div class="seg made" style="width:${madeW}%"></div><div class="seg missed" style="width:${missW}%"></div></div><div class="pct"><b>${madeW}%</b> ${f(d.made)}/${f(d.att)}</div>`;
     shotSysList.appendChild(row);
-    bindTT(row.querySelector('.made'), `${d.sys} — anotados: ${d.made}`);
-    bindTT(row.querySelector('.missed'), `${d.sys} — fallados: ${d.att-d.made}`);
+    bindTT(row.querySelector('.made'), `${d.sys} — anotados: ${f(d.made)}${per}`);
+    bindTT(row.querySelector('.missed'), `${d.sys} — fallados: ${f(d.att-d.made)}${per}`);
   });
   fitNameColumn(shotSysList);
   makePrintColumns(shotSysList);
@@ -2057,12 +2182,12 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
     row.innerHTML = `<div class="name">${esc(d.name)}</div><div class="track">
       <div class="seg t2made" style="width:${t2mW}%"></div><div class="seg t3made" style="width:${t3mW}%"></div>
       <div class="seg t2missed" style="width:${t2missW}%"></div><div class="seg t3missed" style="width:${t3missW}%"></div>
-    </div><div class="pct"><b>${madeW}%</b> ${d.made}/${d.att}</div>`;
+    </div><div class="pct"><b>${madeW}%</b> ${f(d.made)}/${f(d.att)}</div>`;
     finList.appendChild(row);
-    bindTT(row.querySelector('.t2made'), `${d.name} — T2 anotados: ${d.t2m}/${d.t2a}`);
-    bindTT(row.querySelector('.t2missed'), `${d.name} — T2 fallados: ${d.t2a-d.t2m}/${d.t2a}`);
-    bindTT(row.querySelector('.t3made'), `${d.name} — T3 anotados: ${d.t3m}/${d.t3a}`);
-    bindTT(row.querySelector('.t3missed'), `${d.name} — T3 fallados: ${d.t3a-d.t3m}/${d.t3a}`);
+    bindTT(row.querySelector('.t2made'), `${d.name} — T2 anotados: ${f(d.t2m)}/${f(d.t2a)}${per}`);
+    bindTT(row.querySelector('.t2missed'), `${d.name} — T2 fallados: ${f(d.t2a-d.t2m)}/${f(d.t2a)}${per}`);
+    bindTT(row.querySelector('.t3made'), `${d.name} — T3 anotados: ${f(d.t3m)}/${f(d.t3a)}${per}`);
+    bindTT(row.querySelector('.t3missed'), `${d.name} — T3 fallados: ${f(d.t3a-d.t3m)}/${f(d.t3a)}${per}`);
   });
   fitNameColumn(finList);
   makePrintColumns(finList);
@@ -2075,9 +2200,9 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
     const w = Math.max(3, Math.round((d.n/maxGen)*100));
     const madeW = Math.round((d.made/d.n)*w);
     const row = document.createElement('div'); row.className = 'rank-row';
-    row.innerHTML = `<div class="name">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${w}%;background:var(--surface-2);"></div><div class="fill" style="width:${madeW}%;"></div></div><div class="n">${d.made}/${d.n}</div>`;
+    row.innerHTML = `<div class="name">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${w}%;background:var(--surface-2);"></div><div class="fill" style="width:${madeW}%;"></div></div><div class="n">${f(d.made)}/${f(d.n)}</div>`;
     genList.appendChild(row);
-    bindTT(row.querySelectorAll('.fill')[1], `${d.name} — ${d.n} jugadas creadas, ${d.made} acabaron en canasta`);
+    bindTT(row.querySelectorAll('.fill')[1], `${d.name} — ${f(d.n)} jugadas creadas${per}, ${f(d.made)} acabaron en canasta`);
   });
   fitNameColumn(genList);
   makePrintColumns(genList);
@@ -2090,9 +2215,9 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
     const w = Math.max(3, Math.round((d.n/maxReb)*100));
     const madeW = Math.round((d.made/d.n)*w);
     const row = document.createElement('div'); row.className = 'rank-row';
-    row.innerHTML = `<div class="name">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${w}%;background:var(--surface-2);"></div><div class="fill" style="width:${madeW}%;"></div></div><div class="n">${d.made}/${d.n}</div>`;
+    row.innerHTML = `<div class="name">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${w}%;background:var(--surface-2);"></div><div class="fill" style="width:${madeW}%;"></div></div><div class="n">${f(d.made)}/${f(d.n)}</div>`;
     rebList.appendChild(row);
-    bindTT(row.querySelectorAll('.fill')[1], `${d.name} — ${d.n} rebotes ofensivos, ${d.made} acabaron en canasta (${d.pts} pts)`);
+    bindTT(row.querySelectorAll('.fill')[1], `${d.name} — ${f(d.n)} rebotes ofensivos${per}, ${f(d.made)} acabaron en canasta (${f(d.pts)} pts)`);
   });
   fitNameColumn(rebList);
   makePrintColumns(rebList, false);
@@ -2105,26 +2230,26 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
   const pairsBody = document.getElementById(ids.pairsBody); pairsBody.innerHTML = '';
   featured.forEach(p => {
     const tr = document.createElement('tr');
-    const shotTxt = p.attempts ? `${p.made}/${p.attempts}` : '<span class="dim">sin tiro</span>';
+    const shotTxt = p.attempts ? `${f(p.made)}/${f(p.attempts)}` : '<span class="dim">sin tiro</span>';
     const exitoCls = p.exito > 0 ? 'exito-yes' : 'exito-no';
     const sysBadges = p.systems.map(([sys,n]) => `<span class="sysbadge">${esc(sys)}${n>1?` ×${n}`:''}</span>`).join(' ');
     tr.innerHTML = `<td class="sysname">${esc(p.gen)}</td><td class="arrow">→</td><td class="sysname">${esc(p.fin)}</td>
-      <td class="times rep">×${p.n}</td><td class="shotrec">${shotTxt}</td>
-      <td class="${exitoCls}">${p.exito}/${p.n}</td><td class="sysbadges">${sysBadges}</td>`;
+      <td class="times rep">×${f(p.n)}</td><td class="shotrec">${shotTxt}</td>
+      <td class="${exitoCls}">${f(p.exito)}/${f(p.n)}</td><td class="sysbadges">${sysBadges}</td>`;
     pairsBody.appendChild(tr);
   });
 
   // pérdidas / faltas — por jugadora y por sistema
   const toList = document.getElementById(ids.toList); toList.innerHTML = '';
-  turnoversByPlayer(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; toList.appendChild(li); });
+  turnoversByPlayer(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${f(d.n)}</span>`; toList.appendChild(li); });
   const toSysList = document.getElementById(ids.toSysList); toSysList.innerHTML = '';
-  turnoversBySystem(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; toSysList.appendChild(li); });
+  turnoversBySystem(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${f(d.n)}</span>`; toSysList.appendChild(li); });
   const foulList = document.getElementById(ids.foulList); foulList.innerHTML = '';
-  foulsByPlayer(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; foulList.appendChild(li); });
+  foulsByPlayer(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${f(d.n)}</span>`; foulList.appendChild(li); });
   const foulSysList = document.getElementById(ids.foulSysList); foulSysList.innerHTML = '';
-  foulsBySystem(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${d.n}</span>`; foulSysList.appendChild(li); });
+  foulsBySystem(plays).forEach(d => { const li = document.createElement('div'); li.className='li'; li.innerHTML = `<span>${esc(d.name)}</span><span class="n">${f(d.n)}</span>`; foulSysList.appendChild(li); });
 
-  document.getElementById(ids.dashFooter).innerHTML = opts.footerHtml || `<b>Cómo leer este informe:</b> ${plays.length} jugadas ofensivas analizadas · ${kpi.rivalOffReb} rebotes ofensivos del oponente en estas jugadas. «Generadora» (GEN) es quien crea o inicia la jugada, «Finalizadora» (FIN) quien tira, y «Rebote» (REB) quien captura el rebote ofensivo, según el descriptor de jugadoras de Nacsport. T2/T3 y el resultado (C = convertido, F = fallado) proceden de los descriptores de la categoría. <b>Posesiones</b> = tiros de campo intentados + pérdidas + 0,44×tiros libres intentados − rebotes ofensivos propios (${kpi.fga} + ${kpi.turnovers} + 0,44×${kpi.fta} − ${kpi.ownOffReb} = ${kpi.possessions.toFixed(1)}); <b>OER</b> = puntos / posesiones.`;
+  document.getElementById(ids.dashFooter).innerHTML = opts.footerHtml || `${N ? `<b>Medias por partido:</b> cada cifra es el total de la temporada dividido entre los ${N} partidos guardados (1 decimal); los porcentajes y el OER no cambian respecto a los totales. ` : ''}<b>Cómo leer este informe:</b> ${plays.length} jugadas ofensivas analizadas · ${kpi.rivalOffReb} rebotes ofensivos del oponente en estas jugadas. «Generadora» (GEN) es quien crea o inicia la jugada, «Finalizadora» (FIN) quien tira, y «Rebote» (REB) quien captura el rebote ofensivo, según el descriptor de jugadoras de Nacsport. T2/T3 y el resultado (C = convertido, F = fallado) proceden de los descriptores de la categoría. <b>Posesiones</b> = tiros de campo intentados + pérdidas + 0,44×tiros libres intentados − rebotes ofensivos propios (${kpi.fga} + ${kpi.turnovers} + 0,44×${kpi.fta} − ${kpi.ownOffReb} = ${kpi.possessions.toFixed(1)}); <b>OER</b> = puntos / posesiones.`;
 
   // tabla OER
   const table = opts.fakeTable || categoryTable(plays);
@@ -2135,22 +2260,27 @@ function fillReportSection(plays, ids, oppOffRebCount, opts = {}){
       const tr = document.createElement('tr');
       let catCell = '';
       if (i===0) catCell = `<td class="catcell" rowspan="${block.rows.length+1}" style="background:var(--${cls}-bg); color:var(--${cls}-ink);">${esc(block.cat)}</td>`;
-      tr.innerHTML = `${catCell}<td class="label">${esc(r.label)}</td><td>${r.total}</td><td>${r.pts}</td>
+      tr.innerHTML = `${catCell}<td class="label">${esc(r.label)}</td><td>${f(r.total)}</td><td>${f(r.pts)}</td>
         <td class="${oerClass(r.oer)}">${r.oer.toFixed(2)}</td>
-        <td>${r.fgm2}</td><td>${r.fga2}</td><td>${r.fgm3}</td><td>${r.fga3}</td>
-        <td>${r.ftm}</td><td>${r.fta}</td><td>${r.pf}</td><td>${r.to}</td>
-        <td>${r.exito}/${r.total}</td><td>${pctFmt(r.pct_exito)}</td>`;
+        <td>${f(r.fgm2)}</td><td>${f(r.fga2)}</td><td>${f(r.fgm3)}</td><td>${f(r.fga3)}</td>
+        <td>${f(r.ftm)}</td><td>${f(r.fta)}</td><td>${f(r.pf)}</td><td>${f(r.to)}</td>
+        <td>${f(r.exito)}/${f(r.total)}</td><td>${pctFmt(r.pct_exito)}</td>`;
       tbody.appendChild(tr);
     });
     const sub = document.createElement('tr'); sub.className = 'subtotal';
-    sub.innerHTML = `<td class="label">Subtotal ${esc(block.cat)}</td><td>${block.subtotal.total}</td><td>${block.subtotal.pts}</td>
+    sub.innerHTML = `<td class="label">Subtotal ${esc(block.cat)}</td><td>${f(block.subtotal.total)}</td><td>${f(block.subtotal.pts)}</td>
       <td class="${oerClass(block.subtotal.oer)}">${block.subtotal.oer.toFixed(2)}</td><td colspan="8"></td>
-      <td>${block.subtotal.exito}/${block.subtotal.total}</td><td>${pctFmt(block.subtotal.pct_exito)}</td>`;
+      <td>${f(block.subtotal.exito)}/${f(block.subtotal.total)}</td><td>${pctFmt(block.subtotal.pct_exito)}</td>`;
     tbody.appendChild(sub);
   });
 }
 
-function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLabel){
+function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLabel, ropts = {}){
+  // ropts.season: informe de temporada completa — sin bloque de rival (no
+  // tiene sentido mezclar rivales distintos) y con conmutador Totales /
+  // Medias por partido (ropts.mode: 'totals' | 'avg').
+  const season = !!ropts.season;
+  const avgMode = season && ropts.mode === 'avg';
   // La página tiene que estar visible ANTES de construir las listas: varias
   // filas miden su ancho real en pantalla (fitFlexCol/fitNameColumn) para que
   // los nombres no se corten y las barras empiecen/acaben todas en el mismo
@@ -2170,7 +2300,9 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLab
   const cleanPlays = filterExcludedSystems(rawPlays, excludedSystems);
   const ownRaw = cleanPlays.filter(p => classifyTeam(p, ownSet) === 'own');
   const rivalRaw = cleanPlays.filter(p => classifyTeam(p, ownSet) === 'rival');
-  const hasRival = rivalRaw.length > 0;
+  const hasRival = !season && rivalRaw.length > 0;
+  // nº de partidos con jugadas propias: divisor de las medias por partido
+  const seasonN = new Set(ownRaw.map(p => p._matchId)).size;
 
   // El rival se categoriza por partido: rawPlays puede venir de VARIOS
   // partidos a la vez (ver por rival / temporada completa), cada jugada
@@ -2184,11 +2316,13 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLab
   // jugadas del rival identificadas por jugadora, se cuentan de esa forma
   // (más precisas); si no (partido antiguo sin plantilla rival), se usa el
   // contador histórico basado en la etiqueta "POST REB OFF RIVAL".
-  const rivalRebCount = hasRival ? rivalPlays.filter(p => p.reb).length : (rivalOffReb || 0);
+  const rivalRebCount = rivalRaw.length ? rivalPlays.filter(p => p.reb).length : (rivalOffReb || 0);
   const ownRebCount = ownRaw.length ? plays.filter(p => p.reb).length : 0;
 
-  document.getElementById('repTitle').textContent = title;
-  document.getElementById('repSubtitle').textContent = subtitle;
+  document.getElementById('repTitle').textContent = avgMode ? `${title} · Medias por partido` : (season ? `${title} · Totales` : title);
+  document.getElementById('repSubtitle').textContent = avgMode ? `Media por partido de los ${seasonN} partidos guardados.` : subtitle;
+  document.getElementById('seasonMode').classList.toggle('hidden', !season);
+  document.querySelectorAll('#seasonMode .mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === (avgMode ? 'avg' : 'totals')));
   // Título propio para el bloque "Ataque rival": al imprimir, esta vista
   // empieza en una página nueva (break-before) y hasta ahora arrancaba
   // directa en los KPIs sin ningún encabezado que diga de qué equipo se
@@ -2217,7 +2351,8 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLab
   views.forEach(v => { v.style.display = 'block'; });
 
   fillReportSection(plays, OWN_IDS, rivalRebCount, {
-    fakeSys: window.__fakeSys, fakeShotSys: window.__fakeShotSys, fakeTable: window.__fakeTable
+    fakeSys: window.__fakeSys, fakeShotSys: window.__fakeShotSys, fakeTable: window.__fakeTable,
+    avgN: avgMode ? seasonN : 0
   });
 
   if (hasRival) {
@@ -2235,7 +2370,8 @@ function buildReport(rawPlays, rivalOffReb, title, subtitle, metaLabel, rivalLab
   // exportPdf más abajo), así que no hace falta duplicar aquí los datos.
   currentReport = {
     title, subtitle, metaLabel, rivalLabel, hasRival,
-    plays, rivalPlays, rivalRebCount, ownRebCount
+    plays, rivalPlays, rivalRebCount, ownRebCount,
+    season, mode: avgMode ? 'avg' : 'totals', rawPlays, rivalOffReb
   };
 }
 
@@ -2446,7 +2582,7 @@ async function exportPdf(scope){
     }
 
     const r = currentReport;
-    const safeName = (isOwn ? 'Propio' : (r.rivalLabel || 'Rival')).replace(/[^\w\-]+/g, '_');
+    const safeName = (r.season ? (r.mode === 'avg' ? 'Temporada_Medias' : 'Temporada_Totales') : (isOwn ? 'Propio' : (r.rivalLabel || 'Rival'))).replace(/[^\w\-]+/g, '_');
     pdf.save(`Rendimiento_${safeName}.pdf`);
   } catch (err) {
     console.error('Error generando el PDF', err);
@@ -2460,4 +2596,8 @@ async function exportPdf(scope){
    Arranque
    ============================================================ */
 renderMatchesPage();
+initDbSync();
 </script>
+
+</body>
+</html>
