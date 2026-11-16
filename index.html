@@ -489,7 +489,8 @@
 
   <section>
     <h2>Fases de ataque por sistema — Rival <span class="badge-warn" id="cfgSysWarnRival" style="display:none;"></span></h2>
-    <p class="section-note">El rival se configura <b>partido a partido</b>: el mismo nombre de sistema puede significar una jugada distinta según el equipo contrario, así que aquí cada partido tiene su propia asignación de fases (no se comparte entre partidos, ni siquiera frente al mismo rival). Igual que en propio, puedes quitar un sistema que se haya colado por error en ESE partido.</p>
+    <p class="section-note">El rival se configura <b>partido a partido</b>: el mismo nombre de sistema puede significar una jugada distinta según el equipo contrario, así que aquí cada partido tiene su propia asignación de fases (no se comparte entre partidos, ni siquiera frente al mismo rival). Elige el partido en el desplegable para ver su tabla. Igual que en propio, puedes quitar un sistema que se haya colado por error en ESE partido.</p>
+    <select class="rival-select cfg-rival-pick" id="cfgSysRivalPick" aria-label="Partido del rival" style="margin-block-end:14px; max-width:100%;"></select>
     <div id="cfgSysRivalGroups"></div>
     <div class="empty-note" id="cfgSysRivalEmpty" style="display:none;">Todavía no hay sistemas del rival registrados — sube un partido con seguimiento del rival primero.</div>
   </section>
@@ -518,6 +519,7 @@
   <section>
     <h2>Nombres de jugadoras — Rival</h2>
     <p class="section-note">El rival se configura <b>partido a partido</b>: el mismo código puede identificar a jugadoras distintas según el equipo contrario, así que aquí cada partido tiene su propia lista (no se comparte entre partidos, ni siquiera frente al mismo rival).</p>
+    <select class="rival-select cfg-rival-pick" id="cfgPlayerRivalPick" aria-label="Partido del rival" style="margin-block-end:14px; max-width:100%;"></select>
     <div id="cfgPlayerRivalGroups"></div>
     <div class="empty-note" id="cfgPlayerRivalEmpty" style="display:none;">Todavía no hay jugadoras del rival registradas — sube un partido con seguimiento del rival primero.</div>
     <div style="margin-block-start:14px;"><button class="btn secondary" id="btnGuardarCfg" type="button">Guardar cambios</button></div>
@@ -1905,6 +1907,9 @@ function renderConfigPage(){
     }).join('');
     const group = document.createElement('div');
     group.className = 'card';
+    group.dataset.match = m.id;
+    const newInMatch = rivalSystems.filter(sys => !matchMap[sys]).length;
+    group.dataset.label = `${m.rival} · ${fmtDate(m.date)}${m.competition ? ' · ' + m.competition : ''}${newInMatch ? ` (${newInMatch} por revisar)` : ''}`;
     group.style.cssText = 'padding:0; overflow-x:auto; margin-block-end:14px;';
     group.innerHTML = `<div style="padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;">
         <span class="rival" style="font-weight:700;">${esc(m.rival)}</span>
@@ -1976,6 +1981,8 @@ function renderConfigPage(){
     }).join('');
     const group = document.createElement('div');
     group.className = 'card';
+    group.dataset.match = m.id;
+    group.dataset.label = `${m.rival} · ${fmtDate(m.date)}${m.competition ? ' · ' + m.competition : ''}`;
     group.style.cssText = 'padding:0; overflow-x:auto; margin-block-end:14px;';
     group.innerHTML = `<div style="padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;">
         <span class="rival" style="font-weight:700;">${esc(m.rival)}</span>
@@ -1988,7 +1995,37 @@ function renderConfigPage(){
     plRivalGroupsEl.appendChild(group);
   }
   document.getElementById('cfgPlayerRivalEmpty').style.display = anyRivalPlayerMatch ? 'none' : 'block';
+
+  applyCfgRivalPick();
 }
+
+// Configuración del rival: en vez de apilar una tabla por partido (la página
+// crecía con cada rival nuevo), un desplegable elige el partido y solo se
+// muestra su tabla. Las demás siguen en el DOM, ocultas, para que «Guardar
+// cambios» recoja igualmente lo editado en cualquiera de ellas. La elección
+// es compartida por las dos secciones (fases y nombres) y se conserva al
+// volver a pintar la página.
+let cfgRivalMatchId = null;
+function applyCfgRivalPick(){
+  [['cfgSysRivalPick','cfgSysRivalGroups'], ['cfgPlayerRivalPick','cfgPlayerRivalGroups']].forEach(([pickId, groupsId]) => {
+    const pick = document.getElementById(pickId);
+    const groups = [...document.getElementById(groupsId).children];
+    pick.style.display = groups.length ? '' : 'none';
+    pick.innerHTML = '';
+    groups.forEach(g => {
+      const o = document.createElement('option');
+      o.value = g.dataset.match; o.textContent = g.dataset.label;
+      pick.appendChild(o);
+    });
+    const ids = groups.map(g => g.dataset.match);
+    const chosen = ids.includes(cfgRivalMatchId) ? cfgRivalMatchId : (ids[0] || null);
+    if (chosen) pick.value = chosen;
+    groups.forEach(g => { g.style.display = g.dataset.match === chosen ? '' : 'none'; });
+  });
+}
+document.querySelectorAll('.cfg-rival-pick').forEach(pick => {
+  pick.addEventListener('change', () => { cfgRivalMatchId = pick.value; applyCfgRivalPick(); });
+});
 
 document.getElementById('btnGuardarRoster').addEventListener('click', () => {
   const raw = document.getElementById('ownRosterInput').value;
